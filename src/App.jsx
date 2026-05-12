@@ -22,7 +22,8 @@ Example:
   }
 ]`;
 
-const ANSWER_SUMMARY_PROMPT = `You are a problem diagnosis AI. The user has been exploring a problem through a diagnostic tree. Given their investigation path, the question they answered, and their response, provide a concise diagnostic summary that:
+const ANSWER_SUMMARY_PROMPT = `You are a problem diagnosis AI. The user has been exploring a problem through a diagnostic tree. Given their investigation path, the question they answered, and their response, provide a brief diagnostic summary that:
+
 1. Acknowledges what they've narrowed down so far
 2. Interprets their answer in the context of the problem
 3. Suggests a likely root cause or concrete next step
@@ -509,7 +510,9 @@ export default function App() {
         .header h1{
           font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
           letter-spacing:.3em;text-transform:uppercase;color:#5a5a7a;margin-bottom:12px;
+          cursor:pointer;transition:color .2s;
         }
+        .header h1:hover{color:#5a4fff}
         .header p{font-size:11px;color:#3a3a5a;letter-spacing:.1em}
         .model-badge{
           margin-top:10px;font-size:10px;color:#3a3a5a;
@@ -740,7 +743,7 @@ export default function App() {
 
       <div className="app">
         <div className="header">
-          <h1>Reasoning Map</h1>
+          <h1 onClick={handleReset}>Reasoning Map</h1>
           <p>describe a problem — explore it like a map</p>
           {submitted && (
             <div className="model-badge">{getCurrentModel()}</div>
