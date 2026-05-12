@@ -30,8 +30,7 @@ const ANSWER_SUMMARY_PROMPT = `You are a problem diagnosis AI. The user has been
 Keep it to 3-5 sentences. Be specific and actionable.`;
 
 const MODEL_PRIORITY = [
-  "gemini-2.5-flash-preview",
-  "gemini-2.0-flash",
+  "gemini-3.1-flash-lite",
   "gemini-1.5-flash",
 ];
 
@@ -41,10 +40,7 @@ let currentModelIndex = 0;
 let idCounter = 0;
 
 function getCurrentModel() {
-  return (
-    MODEL_PRIORITY[currentModelIndex] ||
-    MODEL_PRIORITY[MODEL_PRIORITY.length - 1]
-  );
+  return MODEL_PRIORITY[currentModelIndex] || MODEL_PRIORITY[MODEL_PRIORITY.length - 1];
 }
 
 function switchToNextModel() {
@@ -61,49 +57,44 @@ function makeUniqueId(baseId) {
 
 function getApiKey() {
   return (
-    (typeof import.meta !== "undefined" &&
-      import.meta.env?.VITE_GEMINI_API_KEY) ||
-    window.GEMINI_API_KEY ||
-    ""
-  );
+    typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_API_KEY
+  ) || window.GEMINI_API_KEY || "AIzaSyAssJ0AkwmXiRD572LBGlgEpftEMDmJSpc";
 }
 
-function extractText(data) {
-  const parts = data.candidates?.[0]?.content?.parts;
-  if (!parts || parts.length === 0) return "";
-  const textPart = parts.find((p) => p.text && !p.thoughtSignature) || parts.find((p) => p.text);
-  return textPart?.text || "";
-}
-
-async function callGemini(systemPrompt, userMessage, wantJson = false) {
+async function callGemini(systemPrompt, userMessage) {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("Missing API key — set VITE_GEMINI_API_KEY in your .env file");
+  if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
 
-  const maxAttempts = MODEL_PRIORITY.length * 2;
+  const maxAttempts = MODEL_PRIORITY.length + 2;
   let lastError;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const model = getCurrentModel();
     const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
 
-    const genConfig = { maxOutputTokens: 8192, temperature: 0.7 };
-    if (wantJson) genConfig.responseMimeType = "application/json";
-
     try {
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: [{ text: userMessage }] }],
-          generationConfig: genConfig,
+          systemInstruction: {
+            parts: [{ text: systemPrompt }],
+          },
+          contents: [
+            { role: "user", parts: [{ text: userMessage }] },
+          ],
+          generationConfig: {
+            maxOutputTokens: 1024,
+            temperature: 0.7,
+          },
         }),
       });
 
       if (response.status === 429) {
         console.warn(`429 from ${model}, switching…`);
-        if (!switchToNextModel())
-          await new Promise((r) => setTimeout(r, 2500 * (attempt + 1)));
+        const switched = switchToNextModel();
+        if (!switched)
+          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
         continue;
       }
 
@@ -119,24 +110,17 @@ async function callGemini(systemPrompt, userMessage, wantJson = false) {
           data.error.status === "RESOURCE_EXHAUSTED" ||
           data.error.code === 429
         ) {
-          if (!switchToNextModel())
-            await new Promise((r) => setTimeout(r, 2500 * (attempt + 1)));
+          console.warn(`Rate limited on ${model}, switching…`);
+          const switched = switchToNextModel();
+          if (!switched)
+            await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
           continue;
         }
         throw new Error(data.error.message || "Gemini API error");
       }
 
-      const finishReason = data.candidates?.[0]?.finishReason;
-      if (finishReason === "MAX_TOKENS") {
-        console.warn(`Output truncated on ${model}, retrying with next model…`);
-        if (!switchToNextModel())
-          await new Promise((r) => setTimeout(r, 1000));
-        continue;
-      }
-
-      const text = extractText(data);
-      if (!text) throw new Error("Empty response from Gemini");
-
+      const text =
+        data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       return { text, model };
     } catch (err) {
       lastError = err;
@@ -144,7 +128,7 @@ async function callGemini(systemPrompt, userMessage, wantJson = false) {
       switchToNextModel();
     }
   }
-  throw lastError || new Error("All models exhausted — please try again later");
+  throw lastError || new Error("All models exhausted");
 }
 
 async function fetchKeywords(problem, path) {
@@ -153,19 +137,9 @@ async function fetchKeywords(problem, path) {
       ? `Problem: "${problem}"\nDiagnosis path so far: ${path.map((p) => p.label).join(" → ")}\nGenerate 5 deeper diagnostic keywords to narrow down the issue further.`
       : `Problem: "${problem}"\nGenerate 5 top-level diagnostic keywords to start diagnosing this problem.`;
 
-  const { text } = await callGemini(SYSTEM_PROMPT, contextMsg, true);
-  let parsed;
-  try {
-    parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
-  } catch {
-    throw new Error(
-      `Could not parse Gemini's response as JSON.\n\nRaw response:\n${text.slice(0, 300)}`
-    );
-  }
-  if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("Gemini returned an empty or invalid keyword list.");
-  }
-  return parsed.map((k) => ({ ...k, id: makeUniqueId(k.id || "node") }));
+  const { text } = await callGemini(SYSTEM_PROMPT, contextMsg);
+  const cleaned = text.replace(/```json|```/g, "").trim();
+  return JSON.parse(cleaned).map((k) => ({ ...k, id: makeUniqueId(k.id) }));
 }
 
 async function fetchAnswerSummary(problem, path, question, answer) {
@@ -175,19 +149,8 @@ Question asked: "${question}"
 User's answer: "${answer}"
 
 Provide a brief diagnostic summary based on this information.`;
-  const { text } = await callGemini(ANSWER_SUMMARY_PROMPT, msg, false);
+  const { text } = await callGemini(ANSWER_SUMMARY_PROMPT, msg);
   return text;
-}
-
-function ErrorBanner({ message, onDismiss }) {
-  if (!message) return null;
-  return (
-    <div className="error-banner">
-      <span className="error-icon">⚠</span>
-      <span className="error-text">{message}</span>
-      <button className="error-dismiss" onClick={onDismiss}>✕</button>
-    </div>
-  );
 }
 
 function Tooltip({ text }) {
@@ -203,19 +166,20 @@ function AnswerModal({ node, path, problem, onClose }) {
   const [answer, setAnswer] = useState("");
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   const handleSubmit = async () => {
     if (!answer.trim()) return;
     setLoading(true);
-    setError(null);
     try {
       const result = await fetchAnswerSummary(
-        problem, path, node.question, answer
+        problem,
+        path,
+        node.question,
+        answer
       );
       setSummary(result);
-    } catch (err) {
-      setError(err.message || "Unable to generate summary.");
+    } catch {
+      setSummary("Unable to generate summary. Please try again.");
     }
     setLoading(false);
   };
@@ -223,16 +187,14 @@ function AnswerModal({ node, path, problem, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose}>✕</button>
+        <button className="modal-close" onClick={onClose}>
+          ✕
+        </button>
 
         <div className="modal-header">
           <span className="modal-node-label">{node.label}</span>
           <p className="modal-question">{node.question}</p>
         </div>
-
-        {error && (
-          <div className="modal-error">{error}</div>
-        )}
 
         {!summary ? (
           <div className="modal-input-area">
@@ -256,7 +218,9 @@ function AnswerModal({ node, path, problem, onClose }) {
             >
               {loading ? (
                 <span className="loading-dots inline-dots">
-                  <span /><span /><span />
+                  <span />
+                  <span />
+                  <span />
                 </span>
               ) : (
                 "Get Insight →"
@@ -269,7 +233,9 @@ function AnswerModal({ node, path, problem, onClose }) {
               {path.map((p, i) => (
                 <span key={p.id}>
                   <span className="path-node">{p.label}</span>
-                  {i < path.length - 1 && <span className="path-arrow"> → </span>}
+                  {i < path.length - 1 && (
+                    <span className="path-arrow"> → </span>
+                  )}
                 </span>
               ))}
               {path.length > 0 && <span className="path-arrow"> → </span>}
@@ -283,7 +249,9 @@ function AnswerModal({ node, path, problem, onClose }) {
               <span className="summary-label">💡 Insight</span>
               <p className="summary-text">{summary}</p>
             </div>
-            <button className="btn-close-summary" onClick={onClose}>Done</button>
+            <button className="btn-close-summary" onClick={onClose}>
+              Done
+            </button>
           </div>
         )}
       </div>
@@ -291,7 +259,15 @@ function AnswerModal({ node, path, problem, onClose }) {
   );
 }
 
-function Node({ node, depth, onChoose, onEliminate, onAnswer, isActive, loading }) {
+function Node({
+  node,
+  depth,
+  onChoose,
+  onEliminate,
+  onAnswer,
+  isActive,
+  loading,
+}) {
   const [hovered, setHovered] = useState(false);
   const eliminated = node.eliminated;
 
@@ -304,18 +280,30 @@ function Node({ node, depth, onChoose, onEliminate, onAnswer, isActive, loading 
       <div className={`node depth-${depth % 4}`}>
         <div className="node-label">{node.label}</div>
         <div className="node-question">{node.question}</div>
-        {hovered && !eliminated && !loading && <Tooltip text={node.tooltip} />}
+        {hovered && !eliminated && !loading && (
+          <Tooltip text={node.tooltip} />
+        )}
         {!eliminated && !loading && (
           <div className="node-actions">
-            <button className="btn-choose" onClick={() => onChoose(node)}>Branch →</button>
-            <button className="btn-answer" onClick={() => onAnswer(node)}>💬</button>
-            <button className="btn-eliminate" onClick={() => onEliminate(node)}>✕</button>
+            <button className="btn-choose" onClick={() => onChoose(node)}>
+              Branch →
+            </button>
+            <button className="btn-answer" onClick={() => onAnswer(node)}>
+              💬
+            </button>
+            <button className="btn-eliminate" onClick={() => onEliminate(node)}>
+              ✕
+            </button>
           </div>
         )}
         {eliminated && <div className="eliminated-label">ruled out</div>}
         {loading && (
           <div className="loading-indicator">
-            <div className="loading-dots"><span /><span /><span /></div>
+            <div className="loading-dots">
+              <span />
+              <span />
+              <span />
+            </div>
             <span className="loading-text">branching…</span>
           </div>
         )}
@@ -328,10 +316,22 @@ function Connector() {
   return <div className="connector" />;
 }
 
-function TreeLevel({ nodes, depth, onChoose, onEliminate, onAnswer, loadingNodeId, focusedPath }) {
+function TreeLevel({
+  nodes,
+  depth,
+  onChoose,
+  onEliminate,
+  onAnswer,
+  loadingNodeId,
+  focusedPath,
+}) {
   const focusedNodeId = focusedPath[depth];
   const shouldFocus = focusedNodeId != null;
-  const visibleNodes = shouldFocus ? nodes.filter((n) => n.id === focusedNodeId) : nodes;
+
+  const visibleNodes = shouldFocus
+    ? nodes.filter((n) => n.id === focusedNodeId)
+    : nodes;
+
   const hiddenCount = shouldFocus ? nodes.length - visibleNodes.length : 0;
 
   return (
@@ -391,7 +391,6 @@ export default function App() {
   const [path, setPath] = useState([]);
   const [loadingNodeId, setLoadingNodeId] = useState(null);
   const [answerNode, setAnswerNode] = useState(null);
-  const [error, setError] = useState(null);
   /* eslint-disable-next-line no-unused-vars */
   const [modelTick, setModelTick] = useState(0);
   const bottomRef = useRef(null);
@@ -399,7 +398,11 @@ export default function App() {
   useEffect(() => {
     if (submitted && bottomRef.current) {
       setTimeout(
-        () => bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }),
+        () =>
+          bottomRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "end",
+          }),
         300
       );
     }
@@ -409,26 +412,30 @@ export default function App() {
     return nodes.map((node) => {
       if (node.id === targetId) return updater(node);
       if (node.children)
-        return { ...node, children: findAndUpdate(node.children, targetId, updater) };
+        return {
+          ...node,
+          children: findAndUpdate(node.children, targetId, updater),
+        };
       return node;
     });
   }, []);
 
   const focusedPath = {};
   if (path.length >= 2) {
-    path.forEach((p, i) => { focusedPath[i] = p.id; });
+    path.forEach((p, i) => {
+      focusedPath[i] = p.id;
+    });
   }
 
   const handleStart = async () => {
     if (!problem.trim()) return;
     setSubmitted(true);
-    setError(null);
     setLoadingNodeId("root");
     try {
       const keywords = await fetchKeywords(problem, []);
       setTree({ id: "root", label: problem, children: keywords });
     } catch (err) {
-      setError(err.message);
+      console.error("Start failed:", err);
     }
     setLoadingNodeId(null);
     setModelTick((v) => v + 1);
@@ -438,17 +445,18 @@ export default function App() {
     const newPath = [...path, node];
     setPath(newPath);
     setLoadingNodeId(node.id);
-    setError(null);
 
     try {
       const children = await fetchKeywords(problem, newPath);
       setTree((prev) => ({
         ...prev,
-        children: findAndUpdate(prev.children, node.id, (n) => ({ ...n, children })),
+        children: findAndUpdate(prev.children, node.id, (n) => ({
+          ...n,
+          children,
+        })),
       }));
     } catch (err) {
-      setError(err.message);
-      setPath(path);
+      console.error("Branch failed:", err);
     }
     setLoadingNodeId(null);
     setModelTick((v) => v + 1);
@@ -457,7 +465,10 @@ export default function App() {
   const handleEliminate = (node) => {
     setTree((prev) => ({
       ...prev,
-      children: findAndUpdate(prev.children, node.id, (n) => ({ ...n, eliminated: true })),
+      children: findAndUpdate(prev.children, node.id, (n) => ({
+        ...n,
+        eliminated: true,
+      })),
     }));
   };
 
@@ -470,7 +481,6 @@ export default function App() {
     setPath([]);
     setLoadingNodeId(null);
     setAnswerNode(null);
-    setError(null);
     currentModelIndex = 0;
     idCounter = 0;
   };
@@ -482,15 +492,19 @@ export default function App() {
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
         body{
-          background:#0a0a0f;color:#e8e4dc;
-          font-family:'DM Mono',monospace;min-height:100vh;
+          background:#0a0a0f;
+          color:#e8e4dc;
+          font-family:'DM Mono',monospace;
+          min-height:100vh;
         }
 
         .app{
-          min-height:100vh;display:flex;flex-direction:column;align-items:center;
+          min-height:100vh;
+          display:flex;flex-direction:column;align-items:center;
           padding:48px 24px 120px;
         }
 
+        /* ── header ── */
         .header{text-align:center;margin-bottom:56px}
         .header h1{
           font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
@@ -498,10 +512,12 @@ export default function App() {
         }
         .header p{font-size:11px;color:#3a3a5a;letter-spacing:.1em}
         .model-badge{
-          margin-top:10px;font-size:10px;color:#3a3a5a;letter-spacing:.08em;
+          margin-top:10px;font-size:10px;color:#3a3a5a;
+          letter-spacing:.08em;
           border:1px solid #1a1a2a;padding:4px 10px;display:inline-block;
         }
 
+        /* ── input ── */
         .input-area{width:100%;max-width:580px;margin-bottom:64px}
         .input-row{display:flex;gap:12px;align-items:stretch}
         .input-field{
@@ -523,30 +539,18 @@ export default function App() {
         .btn-reset{
           background:transparent;color:#3a3a5a;border:1px solid #2a2a3a;
           font-family:'DM Mono',monospace;font-size:11px;
-          padding:8px 16px;cursor:pointer;margin-top:12px;transition:all .2s;
-          display:block;margin-left:auto;
+          padding:8px 16px;cursor:pointer;margin-top:12px;transition:all .2s;display:block;margin-left:auto;
         }
         .btn-reset:hover{color:#e8e4dc;border-color:#5a5a7a}
 
-        .error-banner{
-          width:100%;max-width:580px;background:#1a0a0a;border:1px solid #ff4f4f44;
-          padding:14px 18px;margin-bottom:24px;display:flex;align-items:flex-start;gap:10px;
-          font-size:12px;line-height:1.6;color:#ff9a9a;
-        }
-        .error-icon{font-size:14px;flex-shrink:0;margin-top:1px}
-        .error-text{flex:1;white-space:pre-wrap;word-break:break-word}
-        .error-dismiss{
-          background:none;border:none;color:#ff4f4f88;font-size:12px;
-          cursor:pointer;flex-shrink:0;padding:0;
-        }
-        .error-dismiss:hover{color:#ff4f4f}
-
+        /* ── path trail ── */
         .path-trail{
           font-size:12px;color:#5a5a7a;letter-spacing:.08em;margin-bottom:40px;text-align:center;
         }
         .path-node{color:#5a4fff;font-weight:600}
         .path-arrow{color:#3a3a5a}
 
+        /* ── tree ── */
         .tree-root{display:flex;flex-direction:column;align-items:center;width:100%}
         .root-node{
           background:#0f0f1a;border:1px solid #2a2a3a;
@@ -565,9 +569,11 @@ export default function App() {
 
         .collapsed-indicator{
           font-size:10px;color:#3a3a5a;letter-spacing:.08em;
-          padding:6px 14px;border:1px dashed #1e1e2e;margin:8px 0;align-self:center;
+          padding:6px 14px;border:1px dashed #1e1e2e;margin:8px 0;
+          align-self:center;
         }
 
+        /* ── node ── */
         .node-wrapper{position:relative;transition:opacity .3s}
         .node-wrapper.eliminated{opacity:.35}
 
@@ -587,8 +593,11 @@ export default function App() {
           font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
           color:#e8e4dc;letter-spacing:.05em;margin-bottom:6px;
         }
-        .node-question{font-size:13px;color:#9a9abc;line-height:1.55;letter-spacing:.02em}
+        .node-question{
+          font-size:13px;color:#9a9abc;line-height:1.55;letter-spacing:.02em;
+        }
 
+        /* ── actions ── */
         .node-actions{display:flex;gap:6px;margin-top:12px}
         .btn-choose{
           flex:1;background:#5a4fff18;border:1px solid #5a4fff44;color:#5a4fff;
@@ -614,6 +623,7 @@ export default function App() {
           letter-spacing:.1em;text-transform:uppercase;text-decoration:line-through;
         }
 
+        /* ── tooltip ── */
         .tooltip-box{
           position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);
           background:#1a1a2e;border:1px solid #5a4fff44;color:#b8b4dc;
@@ -622,6 +632,7 @@ export default function App() {
         }
         .tooltip-icon{display:block;margin-bottom:4px;font-size:13px}
 
+        /* ── loading ── */
         .loading-indicator{display:flex;align-items:center;gap:10px;margin-top:12px}
         .loading-text{font-size:11px;color:#5a5a7a;letter-spacing:.08em}
 
@@ -648,6 +659,7 @@ export default function App() {
         }
         .initial-loading .loading-dots span{background:#5a4fff}
 
+        /* ── start-over ── */
         .start-over-area{margin-top:56px}
         .btn-start-over{
           background:transparent;color:#5a5a7a;border:1px solid #2a2a3a;
@@ -656,9 +668,11 @@ export default function App() {
         }
         .btn-start-over:hover{color:#e8e4dc;border-color:#5a4fff;background:#5a4fff12}
 
+        /* ── modal ── */
         .modal-overlay{
           position:fixed;inset:0;background:#0a0a0fdd;z-index:1000;
-          display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);
+          display:flex;align-items:center;justify-content:center;
+          backdrop-filter:blur(6px);
         }
         .modal-content{
           background:#0f0f1a;border:1px solid #2a2a3a;
@@ -675,18 +689,16 @@ export default function App() {
           font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
           color:#5a4fff;letter-spacing:.05em;
         }
-        .modal-question{font-size:14px;color:#9a9abc;margin-top:8px;line-height:1.5}
-
-        .modal-error{
-          background:#1a0a0a;border:1px solid #ff4f4f44;color:#ff9a9a;
-          font-size:12px;padding:12px 14px;margin-bottom:16px;line-height:1.5;
+        .modal-question{
+          font-size:14px;color:#9a9abc;margin-top:8px;line-height:1.5;
         }
 
         .modal-input-area{display:flex;flex-direction:column;gap:12px}
         .modal-textarea{
           background:#0a0a14;border:1px solid #2a2a3a;color:#e8e4dc;
           font-family:'DM Mono',monospace;font-size:13px;
-          padding:14px;min-height:100px;outline:none;resize:vertical;transition:border-color .2s;
+          padding:14px;min-height:100px;outline:none;resize:vertical;
+          transition:border-color .2s;
         }
         .modal-textarea:focus{border-color:#5a4fff}
         .modal-textarea::placeholder{color:#3a3a5a}
@@ -702,11 +714,15 @@ export default function App() {
         .btn-submit-answer:disabled{opacity:.5;cursor:default}
 
         .modal-summary{display:flex;flex-direction:column;gap:20px}
-        .summary-path{font-size:11px;color:#5a5a7a;letter-spacing:.06em;line-height:1.8}
+        .summary-path{
+          font-size:11px;color:#5a5a7a;letter-spacing:.06em;line-height:1.8;
+        }
         .summary-path .path-node{color:#5a4fff}
         .summary-path .path-node.active{color:#4fff9a}
 
-        .summary-section{padding:16px;background:#0a0a14;border:1px solid #1a1a2a}
+        .summary-section{
+          padding:16px;background:#0a0a14;border:1px solid #1a1a2a;
+        }
         .summary-section.insight{border-color:#5a4fff33;background:#5a4fff08}
         .summary-label{
           display:block;font-size:10px;color:#5a5a7a;letter-spacing:.12em;
@@ -726,7 +742,9 @@ export default function App() {
         <div className="header">
           <h1>Reasoning Map</h1>
           <p>describe a problem — explore it like a map</p>
-          {submitted && <div className="model-badge">{getCurrentModel()}</div>}
+          {submitted && (
+            <div className="model-badge">{getCurrentModel()}</div>
+          )}
         </div>
 
         <div className="input-area">
@@ -736,19 +754,23 @@ export default function App() {
               placeholder="Describe your problem..."
               value={problem}
               onChange={(e) => setProblem(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !submitted && handleStart()}
+              onKeyDown={(e) =>
+                e.key === "Enter" && !submitted && handleStart()
+              }
               disabled={submitted}
             />
             {!submitted && (
-              <button className="btn-start" onClick={handleStart}>Map it</button>
+              <button className="btn-start" onClick={handleStart}>
+                Map it
+              </button>
             )}
           </div>
           {submitted && (
-            <button className="btn-reset" onClick={handleReset}>← new problem</button>
+            <button className="btn-reset" onClick={handleReset}>
+              ← new problem
+            </button>
           )}
         </div>
-
-        <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
         {submitted && (
           <>
@@ -756,7 +778,11 @@ export default function App() {
 
             {loadingNodeId === "root" ? (
               <div className="initial-loading">
-                <div className="loading-dots"><span /><span /><span /></div>
+                <div className="loading-dots">
+                  <span />
+                  <span />
+                  <span />
+                </div>
                 mapping the problem…
               </div>
             ) : (
@@ -775,7 +801,9 @@ export default function App() {
                     />
                   )}
                   <div className="start-over-area">
-                    <button className="btn-start-over" onClick={handleReset}>↺ Start Over</button>
+                    <button className="btn-start-over" onClick={handleReset}>
+                      ↺ Start Over
+                    </button>
                   </div>
                 </div>
               )
