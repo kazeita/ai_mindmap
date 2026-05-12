@@ -30,9 +30,12 @@ const ANSWER_SUMMARY_PROMPT = `You are a problem diagnosis AI. The user has been
 Keep it to 3-5 sentences. Be specific and actionable.`;
 
 const MODEL_PRIORITY = [
-  "claude-sonnet-4-20250514",
-  "claude-haiku-4-5-20251001",
+  "gemini-2.5-flash-preview",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
 ];
+
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 let currentModelIndex = 0;
 let idCounter = 0;
@@ -53,50 +56,76 @@ function makeUniqueId(baseId) {
   return `${baseId}__${++idCounter}`;
 }
 
-async function callClaude(systemPrompt, userMessage) {
+function getApiKey() {
+  return (
+    typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_API_KEY
+  ) || window.GEMINI_API_KEY || "AIzaSyAssJ0AkwmXiRD572LBGlgEpftEMDmJSpc";
+}
+
+async function callGemini(systemPrompt, userMessage) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
+
   const maxAttempts = MODEL_PRIORITY.length + 2;
   let lastError;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const model = getCurrentModel();
+    const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
+
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model,
-          max_tokens: 1024,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userMessage }],
+          systemInstruction: {
+            parts: [{ text: systemPrompt }],
+          },
+          contents: [
+            { role: "user", parts: [{ text: userMessage }] },
+          ],
+          generationConfig: {
+            maxOutputTokens: 1024,
+            temperature: 0.7,
+          },
         }),
       });
 
       if (response.status === 429) {
-        const switched = switchToNextModel();
-        if (!switched) {
-          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
-        }
-        continue;
-      }
-
-      if (!response.ok) throw new Error(`API ${response.status}`);
-
-      const data = await response.json();
-
-      if (
-        data.error?.type === "rate_limit_error" ||
-        data.error?.type === "overloaded_error"
-      ) {
+        console.warn(`429 from ${model}, switching…`);
         const switched = switchToNextModel();
         if (!switched)
           await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
         continue;
       }
 
-      const text = data.content?.find((b) => b.type === "text")?.text || "";
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
+        throw new Error(`API ${response.status}: ${errBody.slice(0, 200)}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        if (
+          data.error.status === "RESOURCE_EXHAUSTED" ||
+          data.error.code === 429
+        ) {
+          console.warn(`Rate limited on ${model}, switching…`);
+          const switched = switchToNextModel();
+          if (!switched)
+            await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+          continue;
+        }
+        throw new Error(data.error.message || "Gemini API error");
+      }
+
+      const text =
+        data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       return { text, model };
     } catch (err) {
       lastError = err;
+      console.error(`Error with ${model}:`, err);
       switchToNextModel();
     }
   }
@@ -109,9 +138,9 @@ async function fetchKeywords(problem, path) {
       ? `Problem: "${problem}"\nDiagnosis path so far: ${path.map((p) => p.label).join(" → ")}\nGenerate 5 deeper diagnostic keywords to narrow down the issue further.`
       : `Problem: "${problem}"\nGenerate 5 top-level diagnostic keywords to start diagnosing this problem.`;
 
-  const { text } = await callClaude(SYSTEM_PROMPT, contextMsg);
-  const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
-  return parsed.map((k) => ({ ...k, id: makeUniqueId(k.id) }));
+  const { text } = await callGemini(SYSTEM_PROMPT, contextMsg);
+  const cleaned = text.replace(/```json|```/g, "").trim();
+  return JSON.parse(cleaned).map((k) => ({ ...k, id: makeUniqueId(k.id) }));
 }
 
 async function fetchAnswerSummary(problem, path, question, answer) {
@@ -121,7 +150,7 @@ Question asked: "${question}"
 User's answer: "${answer}"
 
 Provide a brief diagnostic summary based on this information.`;
-  const { text } = await callClaude(ANSWER_SUMMARY_PROMPT, msg);
+  const { text } = await callGemini(ANSWER_SUMMARY_PROMPT, msg);
   return text;
 }
 
@@ -715,7 +744,7 @@ export default function App() {
           <h1>Reasoning Map</h1>
           <p>describe a problem — explore it like a map</p>
           {submitted && (
-            <div className="model-badge">{getCurrentModel().replace("claude-", "").split("-202")[0]}</div>
+            <div className="model-badge">{getCurrentModel()}</div>
           )}
         </div>
 
