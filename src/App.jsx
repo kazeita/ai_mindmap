@@ -31,7 +31,7 @@ Keep it to 3-5 sentences. Be specific and actionable.`;
 
 const MODEL_PRIORITY = [
   "gemini-3.1-flash-lite",
-  "gemini-1.5-flash",
+  "gemini-3.1-flash-lite-preview",
 ];
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
