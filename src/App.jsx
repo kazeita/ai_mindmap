@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 const SYSTEM_PROMPT = `You are a problem diagnosis AI. When given a problem and context, generate exactly 5 diagnostic keywords as a JSON array.
 
@@ -825,6 +826,7 @@ export default function App() {
 
         <div ref={bottomRef} />
       </div>
+      <Analytics />
     </>
   );
 }
