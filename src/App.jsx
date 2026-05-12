@@ -58,7 +58,7 @@ function makeUniqueId(baseId) {
 function getApiKey() {
   return (
     typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_API_KEY
-  ) || window.GEMINI_API_KEY || "AIzaSyAssJ0AkwmXiRD572LBGlgEpftEMDmJSpc";
+  ) || window.GEMINI_API_KEY || "fake_key";
 }
 
 async function callGemini(systemPrompt, userMessage) {
