@@ -30,8 +30,7 @@ const ANSWER_SUMMARY_PROMPT = `You are a problem diagnosis AI. The user has been
 Keep it to 3-5 sentences. Be specific and actionable.`;
 
 const MODEL_PRIORITY = [
-  "gemini-2.5-flash-preview",
-  "gemini-2.0-flash",
+  "gemini-flash-latest",
   "gemini-1.5-flash",
 ];
 
