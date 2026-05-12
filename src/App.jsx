@@ -9,7 +9,7 @@ Each keyword object must have:
 - "tooltip": one insight with specific numbers if possible (max 20 words)
 - "eliminated": false
 
-Return ONLY valid JSON array, no markdown, no explanation.
+Return ONLY valid JSON array, no markdown, no explanation, with the language of the user's prompt.
 
 Example:
 [
