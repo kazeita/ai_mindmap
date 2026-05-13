@@ -10,8 +10,10 @@ export default async function handler(req, res) {
       body: JSON.stringify(req.body)
     }
   );
-  console.log("[response]", response.status, JSON.stringify(data).slice(0, 500));
 
   const data = await response.json();
+  
+  console.log("[response]", response.status, JSON.stringify(data));
+  
   res.status(response.status).json(data);
 }
