@@ -2,6 +2,7 @@
 
 An interactive diagnostic tool that helps you explore problems through an AI-powered reasoning map. Describe a problem, and the app generates diagnostic keywords that branch into deeper investigations.
 Preview here: https://promes.vercel.app/
+<img width="1412" height="858" alt="image" src="https://github.com/user-attachments/assets/8e2e5a31-8954-488b-aae4-f99629797c5e" />
 
 ## Features
 
