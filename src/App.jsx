@@ -31,48 +31,20 @@ const ANSWER_SUMMARY_PROMPT = `You are a problem diagnosis AI. The user has been
 
 Keep it to 3-5 sentences. Be specific and actionable.`;
 
-const MODEL_PRIORITY = [
-  "gemini-3.1-flash-lite",
-  "gemini-3.1-flash-lite-preview",
-];
-
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+const BASE = "/api/chat";
 
 let currentModelIndex = 0;
 let idCounter = 0;
-
-function getCurrentModel() {
-  return MODEL_PRIORITY[currentModelIndex] || MODEL_PRIORITY[MODEL_PRIORITY.length - 1];
-}
-
-function switchToNextModel() {
-  if (currentModelIndex < MODEL_PRIORITY.length - 1) {
-    currentModelIndex++;
-    return true;
-  }
-  return false;
-}
 
 function makeUniqueId(baseId) {
   return `${baseId}__${++idCounter}`;
 }
 
-function getApiKey() {
-  return (
-    typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_API_KEY
-  ) || window.GEMINI_API_KEY || "fake_key";
-}
-
 async function callGemini(systemPrompt, userMessage) {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
-
-  const maxAttempts = MODEL_PRIORITY.length + 2;
   let lastError;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const model = getCurrentModel();
-    const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
+    const url = `${BASE}`;
 
     try {
       const response = await fetch(url, {
@@ -92,14 +64,6 @@ async function callGemini(systemPrompt, userMessage) {
         }),
       });
 
-      if (response.status === 429) {
-        console.warn(`429 from ${model}, switching…`);
-        const switched = switchToNextModel();
-        if (!switched)
-          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
-        continue;
-      }
-
       if (!response.ok) {
         const errBody = await response.text().catch(() => "");
         throw new Error(`API ${response.status}: ${errBody.slice(0, 200)}`);
@@ -112,22 +76,15 @@ async function callGemini(systemPrompt, userMessage) {
           data.error.status === "RESOURCE_EXHAUSTED" ||
           data.error.code === 429
         ) {
-          console.warn(`Rate limited on ${model}, switching…`);
-          const switched = switchToNextModel();
-          if (!switched)
-            await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
-          continue;
+          console.warn(`Rate limited`);
         }
         throw new Error(data.error.message || "Gemini API error");
       }
 
       const text =
         data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      return { text, model };
+      return { text };
     } catch (err) {
-      lastError = err;
-      console.error(`Error with ${model}:`, err);
-      switchToNextModel();
     }
   }
   throw lastError || new Error("All models exhausted");
