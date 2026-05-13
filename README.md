@@ -1,6 +1,7 @@
 # Reasoning Map - AI Mindmap
 
 An interactive diagnostic tool that helps you explore problems through an AI-powered reasoning map. Describe a problem, and the app generates diagnostic keywords that branch into deeper investigations.
+Preview here: https://promes.vercel.app/
 
 ## Features
 
