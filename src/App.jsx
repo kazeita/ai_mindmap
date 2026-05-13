@@ -42,8 +42,6 @@ function makeUniqueId(baseId) {
 
 async function callGemini(systemPrompt, userMessage) {
   let lastError;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const url = `${BASE}`;
 
     try {
@@ -86,8 +84,6 @@ async function callGemini(systemPrompt, userMessage) {
       return { text };
     } catch (err) {
     }
-  }
-  throw lastError || new Error("All models exhausted");
 }
 
 async function fetchKeywords(problem, path) {
@@ -704,7 +700,7 @@ export default function App() {
           <h1 onClick={handleReset}>Reasoning Map</h1>
           <p>describe a problem — explore it like a map</p>
           {submitted && (
-            <div className="model-badge">{getCurrentModel()}</div>
+            <div className="model-badge">gemini-3.1-flash-lite</div>
           )}
         </div>
 
