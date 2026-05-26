@@ -567,6 +567,10 @@ export default function AppV2() {
                   <button className="btn-ghost" onClick={handleReset}>↺ Start over</button>
                 </div>
               )}
+
+              <div className="copyright-footer">
+                © 2026. Sora Pen Studio - Minh Ngo Quang
+              </div>
             </div>
           </LayoutGroup>
         )}
@@ -805,7 +809,10 @@ body{
 
 .footer-actions{margin-top:40px;display:flex;justify-content:center}
 
-/* modal */
+.copyright-footer{
+  margin-top:60px;text-align:center;font-size:12px;color:#9ca3af;
+  letter-spacing:0.02em;
+}
 .modal-overlay{
   position:fixed;inset:0;background:rgba(20,22,40,0.45);
   backdrop-filter:blur(6px);z-index:1000;
