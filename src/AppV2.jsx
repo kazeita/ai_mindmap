@@ -567,11 +567,10 @@ export default function AppV2() {
                   <button className="btn-ghost" onClick={handleReset}>↺ Start over</button>
                 </div>
               )}
-
+            </div>
               <div className="copyright-footer">
                 © 2026. Sora Pen Studio - Minh Ngo Quang
               </div>
-            </div>
           </LayoutGroup>
         )}
 
