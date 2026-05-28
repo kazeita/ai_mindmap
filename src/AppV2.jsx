@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+​import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -13,1014 +13,1001 @@ let idCounter = 0;
 const uid = (s) => `${s}__${++idCounter}`;
 
 const shortLabel = (text) => {
- const words = text.trim().split(/\s+/).slice(0, 4).join(" ");
- return words.length > 28 ? words.slice(0, 26) + "…" : words;
+  const words = text.trim().split(/\s+/).slice(0, 4).join(" ");
+  return words.length > 28 ? words.slice(0, 26) + "…" : words;
 };
 
 async function callApi(kind, userMessage) {
- const res = await fetch(BASE, {
- method: "POST",
- headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ kind, userMessage }),
- });
- if (!res.ok) {
- const body = await res.text().catch(() => "");
- throw new Error(`API ${res.status}: ${body.slice(0, 200)}`);
- }
- const data = await res.json();
- if (data.error) {
- throw new Error(data.error.message || data.error || "API error");
- }
- return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const res = await fetch(BASE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind, userMessage }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`API ${res.status}: ${body.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || data.error || "API error");
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
 async function fetchKeywords(problem, pathLabels, askedQuestions = []) {
- let msg;
- if (pathLabels.length === 0) {
- msg = `Problem: "${problem}"\nGenerate 5 top-level diagnostic items.`;
- } else {
- msg = `Original problem: "${problem}"
+  let msg;
+  if (pathLabels.length === 0) {
+    msg = `Problem: "${problem}"\nGenerate 5 top-level diagnostic items.`;
+  } else {
+    msg = `Original problem: "${problem}"
 Narrowed down through: ${pathLabels.join(" → ")}
 Generate 5 sub-items that further narrow the cause within "${pathLabels[pathLabels.length - 1]}". Stay inside that sub-area.`;
- }
- if (askedQuestions.length > 0) {
- const recent = askedQuestions.slice(-ASKED_HISTORY_CAP);
- msg += `\n\nAlready asked (do NOT repeat or paraphrase any of these — bring genuinely fresh angles):
+  }
+  if (askedQuestions.length > 0) {
+    const recent = askedQuestions.slice(-ASKED_HISTORY_CAP);
+    msg += `\n\nAlready asked (do NOT repeat or paraphrase any of these — bring genuinely fresh angles):
 ${recent.map((q) => `- "${q}"`).join("\n")}`;
- }
- const text = await callApi("keywords", msg);
- const cleaned = text.replace(/```json|```/g, "").trim();
- return JSON.parse(cleaned).map((k) => ({ ...k, id: uid(k.id) }));
+  }
+  const text = await callApi("keywords", msg);
+  const cleaned = text.replace(/```json|```/g, "").trim();
+  return JSON.parse(cleaned).map((k) => ({ ...k, id: uid(k.id) }));
 }
 
 const formatChoices = (choices) =>
- choices
- .map((c, i) => {
- if (c.answer === "added") {
- return `${i + 1}. (User added a custom direction): "${c.question}"`;
- }
- return `${i + 1}. "${c.question}" → ${c.answer.toUpperCase()}`;
- })
- .join("\n");
+  choices
+    .map((c, i) => {
+      if (c.answer === "added") {
+        return `${i + 1}. (User added a custom direction): "${c.question}"`;
+      }
+      return `${i + 1}. "${c.question}" → ${c.answer.toUpperCase()}`;
+    })
+    .join("\n");
 
 async function fetchAnalysis(problem, choices) {
- if (choices.length === 0) return "";
- const msg = `Problem: "${problem}"
+  if (choices.length === 0) return "";
+  const msg = `Problem: "${problem}"
 Choices so far:
 ${formatChoices(choices)}
 
 Write a short current analysis (3–5 sentences).`;
- return callApi("analysis", msg);
+  return callApi("analysis", msg);
 }
 
 async function fetchConclusion(problem, choices) {
- const msg = `Problem: "${problem}"
+  const msg = `Problem: "${problem}"
 Choices so far:
 ${formatChoices(choices)}
 
 Write the structured conclusion with a summary paragraph then a numbered step-by-step solution.`;
- return callApi("conclusion", msg);
+  return callApi("conclusion", msg);
 }
 
 async function fetchFollowup(problem, conclusion, reply) {
- const msg = `Problem: "${problem}"
+  const msg = `Problem: "${problem}"
 Conclusion shown to user: """${conclusion}"""
 User's reply to "Does this solve your problem?": "${reply}"
 
 Respond.`;
- return callApi("followup", msg);
+  return callApi("followup", msg);
 }
 
 async function fetchDetails(problem, pathLabels, kw) {
- const msg = `Problem: "${problem}"
+  const msg = `Problem: "${problem}"
 Path: ${pathLabels.length ? pathLabels.join(" → ") : "(top level)"}
 Question being explored: "${kw.question}"
 Short brief: "${kw.tooltip || ""}"
 
-Write a ~200-word friendly explanation of how this could be the cause, what to look at, and how to verify.`;
- return callApi("details", msg);
+Write a ~200-word friendly explanation of how this could be the cause, what to inspect, and how to verify.`;
+  return callApi("details", msg);
 }
 
 async function fetchInsight(problem, pathLabels, kw, answer) {
- const msg = `Problem: "${problem}"
+  const msg = `Problem: "${problem}"
 Path: ${pathLabels.length ? pathLabels.join(" → ") : "(top level)"}
 Question under investigation: "${kw.question}" — ${kw.tooltip || ""}
 User's answer: "${answer}"
 
-Provide a brief diagnostic insight.`;
- return callApi("insight", msg);
+Provide a brief diagnostic summary.`;
+  return callApi("insight", msg);
 }
 
 /* ───────────────────────── visual atoms ───────────────────────── */
 
 function RootCard({ problem }) {
- return (
- <motion.div layout className="root-card">
- <span className="tag">your problem</span>
- <p className="root-text">{problem}</p>
- </motion.div>
- );
+  return (
+    <motion.div layout className="root-card">
+      <span className="tag">your problem</span>
+      <p className="root-text">{problem}</p>
+    </motion.div>
+  );
 }
 
 function ParentCard({ label, question, tooltip, source }) {
- const isUser = source === "user";
- return (
- <motion.div layout className={`parent-card ${isUser ? "from-user" : ""}`}>
- <span className="tag">{isUser ? "you added" : "exploring"}</span>
- <h3 className="parent-text">{label}</h3>
- {question && <p className="parent-sub">{question}</p>}
- {tooltip && <p className="parent-tooltip">{tooltip}</p>}
- </motion.div>
- );
+  const isUser = source === "user";
+  return (
+    <motion.div layout className={`parent-card ${isUser ? "from-user" : ""}`}>
+      <span className="tag">{isUser ? "you added" : "exploring"}</span>
+      <h3 className="parent-text">{label}</h3>
+      {question && <p className="parent-sub">{question}</p>}
+      {tooltip && <p className="parent-tooltip">{tooltip}</p>}
+    </motion.div>
+  );
 }
 
 function ChosenBadge({ kw }) {
- return (
- <motion.div layoutId={`kw-${kw.id}`} className="chosen-badge">
- <span className="check">✓</span>
- <span className="chosen-label">{kw.label}</span>
- </motion.div>
- );
+  return (
+    <motion.div layoutId={`kw-${kw.id}`} className="chosen-badge">
+      <span className="check">✓</span>
+      <span className="chosen-label">{kw.label}</span>
+    </motion.div>
+  );
 }
 
 function RejectedChip({ kw, onReopen }) {
- return (
- <motion.button
- layoutId={`kw-${kw.id}`}
- onClick={() => onReopen(kw)}
- className="rejected-chip"
- whileHover={{ opacity: 1, y: -2 }}
- title="click to reconsider"
- >
- <span className="rejected-x">✕</span>
- <span className="rejected-label">{kw.label}</span>
- </motion.button>
- );
+  return (
+    <motion.button
+      layoutId={`kw-${kw.id}`}
+      onClick={() => onReopen(kw)}
+      className="rejected-chip"
+      whileHover={{ opacity: 1, y: -2 }}
+      title="click to reconsider"
+    >
+      <span className="rejected-x">✕</span>
+      <span className="rejected-label">{kw.label}</span>
+    </motion.button>
+  );
 }
 
 function ActiveCard({ kw, onYes, onNo, onDetails, onInsight, busy }) {
- const [text, setText] = useState("");
- const [insight, setInsight] = useState(null);
- const [insightLoading, setInsightLoading] = useState(false);
+  const [text, setText] = useState("");
+  const [insight, setInsight] = useState(null);
+  const [insightLoading, setInsightLoading] = useState(false);
 
- const submitInsight = async () => {
- if (!text.trim() || insightLoading || busy) return;
- setInsightLoading(true);
- setInsight(null);
- try {
- const s = await onInsight(kw, text.trim());
- setInsight(s);
- } catch {
- setInsight("Hmm, couldn't pull an insight just now. Try again?");
- }
- setInsightLoading(false);
- };
+  const submitInsight = async () => {
+    if (!text.trim() || insightLoading || busy) return;
+    setInsightLoading(true);
+    setInsight(null);
+    try {
+      const s = await onInsight(kw, text.trim());
+      setInsight(s);
+    } catch {
+      setInsight("Hmm, couldn't pull an insight just now. Try again?");
+    }
+    setInsightLoading(false);
+  };
 
- return (
- <motion.div
- layoutId={`kw-${kw.id}`}
- className="active-wrap"
- transition={{ type: "spring", stiffness: 220, damping: 28 }}
- >
- <div className={`active-card ${busy ? "busy" : ""}`}>
- <button
- className="btn-info"
- onClick={() => onDetails(kw)}
- disabled={busy}
- title="More details"
- aria-label="More details"
- >
- <span className="info-icon">i</span>
- </button>
+  return (
+    <motion.div
+      layoutId={`kw-${kw.id}`}
+      className="active-wrap"
+      transition={{ type: "spring", stiffness: 220, damping: 28 }}
+    >
+      <div className={`active-card ${busy ? "busy" : ""}`}>
+        <button
+          className="btn-info"
+          onClick={() => onDetails(kw)}
+          disabled={busy}
+          title="More details"
+          aria-label="More details"
+        >
+          <span className="info-icon">i</span>
+        </button>
 
- <motion.div
- initial={{ opacity: 0, y: 8 }}
- animate={{ opacity: 1, y: 0 }}
- transition={{ delay: 0.08 }}
- >
- <h2 className="active-question-title">{kw.question}</h2>
- <p className="active-desc">{kw.tooltip}</p>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+        >
+          <h2 className="active-question-title">{kw.question}</h2>
+          <p className="active-desc">{kw.tooltip}</p>
 
- <div className="active-actions">
- <button className="btn-yes" onClick={() => onYes(kw)} disabled={busy}>Yes</button>
- <button className="btn-no" onClick={() => onNo(kw)} disabled={busy}>No</button>
- </div>
+          <div className="active-actions">
+            <button className="btn-yes" onClick={() => onYes(kw)} disabled={busy}>Yes</button>
+            <button className="btn-no" onClick={() => onNo(kw)} disabled={busy}>No</button>
+          </div>
 
- <div className="active-input-row">
- <input
- className="active-input"
- placeholder="or tell me what's going on…"
- value={text}
- onChange={(e) => setText(e.target.value)}
- onKeyDown={(e) => {
- if (e.key === "Enter") { e.preventDefault(); submitInsight(); }
- }}
- disabled={busy}
- />
- <button
- className="btn-input-submit"
- onClick={submitInsight}
- disabled={busy || insightLoading || !text.trim()}
- title="Get a quick insight"
- aria-label="Get a quick insight"
- >
- {insightLoading ? <span className="dots tiny"><span /><span /><span /></span> : "→"}
- </button>
- </div>
+          <div className="active-input-row">
+            <input
+              className="active-input"
+              placeholder="or tell me what's going on…"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitInsight(); } }}
+              disabled={busy}
+            />
+            <button
+              className="btn-input-submit"
+              onClick={submitInsight}
+              disabled={busy || insightLoading || !text.trim()}
+              title="Get a quick insight"
+              aria-label="Get a quick insight"
+            >
+              {insightLoading ? <span className="dots tiny"><span /><span /><span /></span> : "→"}
+            </button>
+          </div>
 
- <AnimatePresence>
- {insight && (
- <motion.div
- className="active-insight"
- initial={{ opacity: 0, y: -4, height: 0 }}
- animate={{ opacity: 1, y: 0, height: "auto" }}
- exit={{ opacity: 0, y: -4, height: 0 }}
- transition={{ duration: 0.25 }}
- >
- <span className="lbl">💡 insight</span>
- <p>{insight}</p>
- </motion.div>
- )}
- </AnimatePresence>
- </motion.div>
- </div>
- </motion.div>
- );
+          <AnimatePresence>
+            {insight && (
+              <motion.div
+                className="active-insight"
+                initial={{ opacity: 0, y: -4, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: -4, height: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <span className="lbl">💡 insight</span>
+                <p>{insight}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+    </motion.div>
+  );
 }
 
 function Connector({ short }) {
- return <div className={short ? "connector short" : "connector"} />;
+  return <div className={short ? "connector short" : "connector"} />;
 }
 
 function LoadingBlock({ label = "thinking…" }) {
- return (
- <div className="loading-block">
- <span className="dots"><span /><span /><span /></span>
- <span>{label}</span>
- </div>
- );
+  return (
+    <div className="loading-block">
+      <span className="dots"><span /><span /><span /></span>
+      <span>{label}</span>
+    </div>
+  );
 }
 
 /* ───────────────────────── level ───────────────────────── */
 
 function LevelView({
- level,
- isCurrent,
- loading,
- onYes, onNo, onDetails, onInsight, onReopen,
+  level,
+  isCurrent,
+  loading,
+  onYes, onNo, onDetails, onInsight, onReopen,
 }) {
- const {
- parentLabel, parentQuestion, parentTooltip, parentSource,
- keywords, currentIndex, rejectedIds, chosenId, isRoot,
- } = level;
- const rejected = keywords.filter((k) => rejectedIds.includes(k.id));
- const chosen = chosenId ? keywords.find((k) => k.id === chosenId) : null;
- const active = !chosen && currentIndex < keywords.length ? keywords[currentIndex] : null;
- const showActiveArea = active || chosen || (isCurrent && loading);
+  const {
+    parentLabel, parentQuestion, parentTooltip, parentSource,
+    keywords, currentIndex, rejectedIds, chosenId, isRoot,
+  } = level;
+  const rejected = keywords.filter((k) => rejectedIds.includes(k.id));
+  const chosen = chosenId ? keywords.find((k) => k.id === chosenId) : null;
+  const active = !chosen && currentIndex < keywords.length ? keywords[currentIndex] : null;
+  const showActiveArea = active || chosen || (isCurrent && loading);
 
- return (
- <div className="level">
- <div className="level-parent">
- {isRoot
- ? <RootCard problem={parentLabel} />
- : <ParentCard
- label={parentLabel}
- question={parentQuestion}
- tooltip={parentTooltip}
- source={parentSource}
- />}
- </div>
+  return (
+    <div className="level">
+      <div className="level-parent">
+        {isRoot
+          ? <RootCard problem={parentLabel} />
+          : <ParentCard
+              label={parentLabel}
+              question={parentQuestion}
+              tooltip={parentTooltip}
+              source={parentSource}
+            />}
+      </div>
 
- {(showActiveArea || rejected.length > 0) && <Connector />}
+      {(showActiveArea || rejected.length > 0) && <Connector />}
 
- {(showActiveArea || rejected.length > 0) && (
- <div className="level-row">
- {rejected.length > 0 && (
- <div className="rejected-stack">
- <AnimatePresence>
- {rejected.map((kw) => (
- <RejectedChip key={kw.id} kw={kw} onReopen={onReopen} />
- ))}
- </AnimatePresence>
- </div>
- )}
+      {(showActiveArea || rejected.length > 0) && (
+        <div className="level-row">
+          {rejected.length > 0 && (
+            <div className="rejected-stack">
+              <AnimatePresence>
+                {rejected.map((kw) => (
+                  <RejectedChip key={kw.id} kw={kw} onReopen={onReopen} />
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
 
- <div className="active-area">
- <AnimatePresence mode="popLayout">
- {chosen ? (
- <ChosenBadge key={`chosen-${chosen.id}`} kw={chosen} />
- ) : isCurrent && loading ? (
- <motion.div
- key="loading"
- initial={{ opacity: 0, y: 8 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -4 }}
- >
- <LoadingBlock label="thinking…" />
- </motion.div>
- ) : active ? (
- <ActiveCard
- key={active.id}
- kw={active}
- onYes={onYes}
- onNo={onNo}
- onDetails={onDetails}
- onInsight={onInsight}
- />
- ) : null}
- </AnimatePresence>
- </div>
- </div>
- )}
- </div>
- );
+          <div className="active-area">
+            <AnimatePresence mode="popLayout">
+              {chosen ? (
+                <ChosenBadge key={`chosen-${chosen.id}`} kw={chosen} />
+              ) : isCurrent && loading ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                >
+                  <LoadingBlock label="thinking…" />
+                </motion.div>
+              ) : active ? (
+                <ActiveCard
+                  key={active.id}
+                  kw={active}
+                  onYes={onYes}
+                  onNo={onNo}
+                  onDetails={onDetails}
+                  onInsight={onInsight}
+                />
+              ) : null}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ───────────────────────── analysis panel ───────────────────────── */
 
 function AnalysisPanel({ analysis, loading, stepCount }) {
- const progress = stepCount === 0
- ? 0
- : (stepCount % STEPS_PER_CONCLUSION === 0
- ? 1
- : (stepCount % STEPS_PER_CONCLUSION) / STEPS_PER_CONCLUSION);
- const remaining = stepCount === 0
- ? STEPS_PER_CONCLUSION
- : (stepCount % STEPS_PER_CONCLUSION === 0 ? 0 : STEPS_PER_CONCLUSION - (stepCount % STEPS_PER_CONCLUSION));
+  const progress = stepCount === 0
+    ? 0
+    : (stepCount % STEPS_PER_CONCLUSION === 0
+      ? 1
+      : (stepCount % STEPS_PER_CONCLUSION) / STEPS_PER_CONCLUSION);
+  const remaining = stepCount === 0
+    ? STEPS_PER_CONCLUSION
+    : (stepCount % STEPS_PER_CONCLUSION === 0 ? 0 : STEPS_PER_CONCLUSION - (stepCount % STEPS_PER_CONCLUSION));
 
- return (
- <div className="analysis-panel">
- <div className="panel-head">
- <span className="panel-tag">current analysis</span>
- <span className="panel-step">step {stepCount}</span>
- </div>
- <div className="panel-body">
- {!analysis && loading ? (
- <div className="panel-loading">
- <span className="dots"><span /><span /><span /></span>
- <span>reading the room…</span>
- </div>
- ) : analysis ? (
- <>
- <motion.p
- key={analysis}
- className="panel-text"
- initial={{ opacity: 0, y: 6 }}
- animate={{ opacity: 1, y: 0 }}
- transition={{ duration: 0.4 }}
- >
- {analysis}
- </motion.p>
- {loading && (
- <div className="panel-loading mini">
- <span className="dots"><span /><span /><span /></span>
- <span>updating…</span>
- </div>
- )}
- </>
- ) : (
- <p className="panel-empty">
- As you answer, a short running take on your problem will appear here.
- </p>
- )}
- </div>
- {stepCount > 0 && (
- <div className="panel-footer">
- <div className="panel-progress">
- <div className="panel-progress-bar" style={{ width: `${progress * 100}%` }} />
- </div>
- <span className="panel-progress-label">
- {remaining === 0
- ? "conclusion ready"
- : `${remaining} step${remaining === 1 ? "" : "s"} to next conclusion`}
- </span>
- </div>
- )}
- </div>
- );
+  return (
+    <div className="analysis-panel">
+      <div className="panel-head">
+        <span className="panel-tag">current analysis</span>
+        <span className="panel-step">step {stepCount}</span>
+      </div>
+      <div className="panel-body">
+        {!analysis && loading ? (
+          <div className="panel-loading">
+            <span className="dots"><span /><span /><span /></span>
+            <span>reading the room…</span>
+          </div>
+        ) : analysis ? (
+          <>
+            <motion.p
+              key={analysis}
+              className="panel-text"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              {analysis}
+            </motion.p>
+            {loading && (
+              <div className="panel-loading mini">
+                <span className="dots"><span /><span /><span /></span>
+                <span>updating…</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="panel-empty">
+            As you answer questions, a short running analysis will appear here.
+          </p>
+        )}
+      </div>
+      {stepCount > 0 && (
+        <div className="panel-footer">
+          <div className="panel-progress">
+            <div className="panel-progress-bar" style={{ width: `${progress * 100}%` }} />
+          </div>
+          <span className="panel-progress-label">
+            {remaining === 0
+              ? "conclusion ready"
+              : `${remaining} step${remaining === 1 ? "" : "s"} to next conclusion`}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ───────────────────────── modals ───────────────────────── */
 
 function ModalShell({ children, onClose, wide }) {
- return (
- <motion.div
- className="modal-overlay"
- onClick={onClose}
- initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
- >
- <motion.div
- className={`modal ${wide ? "wide" : ""}`}
- onClick={(e) => e.stopPropagation()}
- initial={{ opacity: 0, y: 16, scale: 0.97 }}
- animate={{ opacity: 1, y: 0, scale: 1 }}
- exit={{ opacity: 0, y: 10, scale: 0.97 }}
- transition={{ type: "spring", stiffness: 240, damping: 28 }}
- >
- <button className="modal-close" onClick={onClose}>✕</button>
- {children}
- </motion.div>
- </motion.div>
- );
+  return (
+    <motion.div
+      className="modal-overlay"
+      onClick={onClose}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className={`modal ${wide ? "wide" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0, y: 16, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 10, scale: 0.97 }}
+        transition={{ type: "spring", stiffness: 240, damping: 28 }}
+      >
+        <button className="modal-close" onClick={onClose}>✕</button>
+        {children}
+      </motion.div>
+    </motion.div>
+  );
 }
 
 function DetailsModal({ keyword, content, loading, onClose }) {
- return (
- <ModalShell onClose={onClose}>
- <span className="modal-tag">more details</span>
- <h2 className="modal-title">{keyword.question}</h2>
- <p className="modal-sub">{keyword.tooltip}</p>
- {loading
- ? <div className="modal-loading"><span className="dots"><span /><span /><span /></span><p>writing a deeper explanation…</p></div>
- : <div className="modal-body">{content}</div>}
- </ModalShell>
- );
+  return (
+    <ModalShell onClose={onClose}>
+      <span className="modal-tag">more details</span>
+      <h2 className="modal-title">{keyword.question}</h2>
+      <p className="modal-sub">{keyword.tooltip}</p>
+      {loading
+        ? <div className="modal-loading"><span className="dots"><span /><span /><span /></span><p>writing a deeper explanation…</p></div>
+        : <div className="modal-body">{content}</div>}
+    </ModalShell>
+  );
 }
 
 function ConclusionModal({ problem, choices, content, loading, onClose, onExploreMore }) {
- const [reply, setReply] = useState("");
- const [followup, setFollowup] = useState(null);
- const [followupLoading, setFollowupLoading] = useState(false);
+  const [reply, setReply] = useState("");
+  const [followup, setFollowup] = useState(null);
+  const [followupLoading, setFollowupLoading] = useState(false);
 
- const handleQuickReply = async () => {
- if (!reply.trim() || followupLoading) return;
- setFollowupLoading(true);
- try {
- const text = await fetchFollowup(problem, content || "", reply);
- setFollowup(text);
- } catch {
- setFollowup("Couldn't pull a quick reply right now.");
- }
- setFollowupLoading(false);
- };
+  const handleQuickReply = async () => {
+    if (!reply.trim() || followupLoading) return;
+    setFollowupLoading(true);
+    try {
+      const text = await fetchFollowup(problem, content || "", reply);
+      setFollowup(text);
+    } catch {
+      setFollowup("Could not generate a follow-up right now.");
+    }
+    setFollowupLoading(false);
+  };
 
- const handleExplore = () => onExploreMore(reply);
+  const handleExplore = () => onExploreMore(reply);
 
- const hasReply = reply.trim().length > 0;
+  const hasReply = reply.trim().length > 0;
 
- return (
- <ModalShell onClose={onClose} wide>
- <span className="modal-tag">conclusion · step {choices.length}</span>
- <h2 className="modal-title">Where we've landed</h2>
- <p className="modal-sub">
- A quick take based on your {choices.length} answers so far.
- </p>
+  return (
+    <ModalShell onClose={onClose} wide>
+      <span className="modal-tag">conclusion · step {choices.length}</span>
+      <h2 className="modal-title">Where we've landed</h2>
+      <p className="modal-sub">A diagnostic summary based on your {choices.length} answers so far.</p>
 
- {loading ? (
- <div className="modal-loading">
- <span className="dots"><span /><span /><span /></span>
- <p>writing your conclusion…</p>
- </div>
- ) : (
- <>
- <div className="conclusion-body">{content}</div>
+      {loading ? (
+        <div className="modal-loading">
+          <span className="dots"><span /><span /><span /></span>
+          <p>writing your conclusion…</p>
+        </div>
+      ) : (
+        <>
+          <div className="conclusion-body">{content}</div>
 
- <p className="conclusion-question">Does this solve your problem?</p>
+          <p className="conclusion-question">Does this solve your problem?</p>
 
- <textarea
- className="modal-textarea"
- placeholder="Tell us how it went — or describe what you'd like to explore next…"
- value={reply}
- onChange={(e) => setReply(e.target.value)}
- onKeyDown={(e) => {
- if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
- e.preventDefault();
- handleExplore();
- }
- }}
- autoFocus
- />
+          <textarea
+            className="modal-textarea"
+            placeholder="Tell us how it went — or describe what you'd like to explore next…"
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                handleExplore();
+              }
+            }}
+            autoFocus
+          />
 
- {followup && (
- <div className="modal-body">
- <div className="insight-block insight">
- <span className="lbl">💡 quick reply</span>
- <p>{followup}</p>
- </div>
- </div>
- )}
+          {followup && (
+            <div className="modal-body">
+              <div className="insight-block insight">
+                <span className="lbl">💡 quick reply</span>
+                <p>{followup}</p>
+              </div>
+            </div>
+          )}
 
- <div className="modal-actions">
- <button className="btn-ghost" onClick={onClose}>Close</button>
- <button
- className="btn-secondary"
- onClick={handleQuickReply}
- disabled={followupLoading || !hasReply}
- title="Get a short AI reply without leaving this conclusion"
- >
- {followupLoading ? "Thinking…" : "Quick reply"}
- </button>
- <button
- className="btn-primary small"
- onClick={handleExplore}
- title={
- hasReply
- ? "Use your input as the next step in the map"
- : "Close and keep exploring the map"
- }
- >
- {hasReply ? "Explore more →" : "Keep exploring"}
- </button>
- </div>
+          <div className="modal-actions">
+            <button className="btn-ghost" onClick={onClose}>Close</button>
+            <button
+              className="btn-secondary"
+              onClick={handleQuickReply}
+              disabled={followupLoading || !hasReply}
+              title="Get a short AI reply without leaving this conclusion"
+            >
+              {followupLoading ? "Thinking…" : "Quick reply"}
+            </button>
+            <button
+              className="btn-primary small"
+              onClick={handleExplore}
+              title={hasReply
+                ? "Use your input as the next step in the map"
+                : "Close and keep exploring the map"}
+            >
+              {hasReply ? "Explore more →" : "Keep exploring"}
+            </button>
+          </div>
 
- {hasReply && (
- <p className="explore-hint">
- "Explore more" will add your input as the next step and branch the map from there.
- </p>
- )}
- </>
- )}
- </ModalShell>
- );
+          {hasReply && (
+            <p className="explore-hint">
+              "Explore more" will add your input as the next step and branch the map from there.
+            </p>
+          )}
+        </>
+      )}
+    </ModalShell>
+  );
 }
 
 /* ───────────────────────── root ───────────────────────── */
 
 export default function AppV2() {
- const [problem, setProblem] = useState("");
- const [submitted, setSubmitted] = useState(false);
- const [levels, setLevels] = useState([]);
- const [loading, setLoading] = useState(false);
+  const [problem, setProblem] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [levels, setLevels] = useState([]);
+  const [loading, setLoading] = useState(false);
 
- const [choices, setChoices] = useState([]);
- const [analysis, setAnalysis] = useState("");
- const [analysisLoading, setAnalysisLoading] = useState(false);
- const [lastConclusionAt, setLastConclusionAt] = useState(0);
+  const [choices, setChoices] = useState([]);
+  const [analysis, setAnalysis] = useState("");
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [lastConclusionAt, setLastConclusionAt] = useState(0);
 
- const [conclusionOpen, setConclusionOpen] = useState(false);
- const [conclusionContent, setConclusionContent] = useState(null);
- const [conclusionLoading, setConclusionLoading] = useState(false);
+  const [conclusionOpen, setConclusionOpen] = useState(false);
+  const [conclusionContent, setConclusionContent] = useState(null);
+  const [conclusionLoading, setConclusionLoading] = useState(false);
 
- const [detailsTarget, setDetailsTarget] = useState(null);
- const [detailsContent, setDetailsContent] = useState(null);
- const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsTarget, setDetailsTarget] = useState(null);
+  const [detailsContent, setDetailsContent] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
- const currentLevel = levels[levels.length - 1];
- const pathLabels = currentLevel?.pathLabels || [];
- const stepCount = choices.length;
- const askedQuestions = useMemo(() => choices.map((c) => c.question), [choices]);
+  const currentLevel = levels[levels.length - 1];
+  const pathLabels = currentLevel?.pathLabels || [];
+  const stepCount = choices.length;
+  const askedQuestions = useMemo(() => choices.map((c) => c.question), [choices]);
 
- /* ── helpers ── */
+  /* ── helpers ── */
 
- const maybeTriggerConclusion = async (newChoices) => {
- if (
- newChoices.length > 0 &&
- newChoices.length % STEPS_PER_CONCLUSION === 0 &&
- newChoices.length > lastConclusionAt
- ) {
- setLastConclusionAt(newChoices.length);
- setConclusionOpen(true);
- setConclusionContent(null);
- setConclusionLoading(true);
- try {
- const text = await fetchConclusion(problem, newChoices);
- setConclusionContent(text);
- } catch {
- setConclusionContent("Couldn't generate a conclusion right now.");
- }
- setConclusionLoading(false);
- }
- };
+  const maybeTriggerConclusion = async (newChoices) => {
+    if (
+      newChoices.length > 0 &&
+      newChoices.length % STEPS_PER_CONCLUSION === 0 &&
+      newChoices.length > lastConclusionAt
+    ) {
+      setLastConclusionAt(newChoices.length);
+      setConclusionOpen(true);
+      setConclusionContent(null);
+      setConclusionLoading(true);
+      try {
+        const text = await fetchConclusion(problem, newChoices);
+        setConclusionContent(text);
+      } catch {
+        setConclusionContent("Couldn't generate a conclusion right now.");
+      }
+      setConclusionLoading(false);
+    }
+  };
 
- const refreshAnalysis = async (choicesNow) => {
- if (choicesNow.length === 0) { setAnalysis(""); return; }
- setAnalysisLoading(true);
- try {
- const text = await fetchAnalysis(problem, choicesNow);
- setAnalysis(text);
- } catch (e) { console.error("analysis failed", e); }
- setAnalysisLoading(false);
- };
+  const refreshAnalysis = async (choicesNow) => {
+    if (choicesNow.length === 0) { setAnalysis(""); return; }
+    setAnalysisLoading(true);
+    try {
+      const text = await fetchAnalysis(problem, choicesNow);
+      setAnalysis(text);
+    } catch (e) { console.error("analysis failed", e); }
+    setAnalysisLoading(false);
+  };
 
- /* ── handlers ── */
+  /* ── handlers ── */
 
- const handleStart = async () => {
- if (!problem.trim() || submitted) return;
- setSubmitted(true);
- setLoading(true);
- try {
- const kws = await fetchKeywords(problem, [], []);
- setLevels([{
- parentLabel: problem,
- parentQuestion: null,
- parentTooltip: null,
- parentSource: "ai",
- isRoot: true,
- keywords: kws,
- currentIndex: 0,
- rejectedIds: [],
- chosenId: null,
- pathLabels: [],
- }]);
- } catch (e) { console.error("start failed", e); }
- setLoading(false);
- };
+  const handleStart = async () => {
+    if (!problem.trim() || submitted) return;
+    setSubmitted(true);
+    setLoading(true);
+    try {
+      const kws = await fetchKeywords(problem, [], []);
+      setLevels([{
+        parentLabel: problem,
+        parentQuestion: null,
+        parentTooltip: null,
+        parentSource: "ai",
+        isRoot: true,
+        keywords: kws,
+        currentIndex: 0,
+        rejectedIds: [],
+        chosenId: null,
+        pathLabels: [],
+      }]);
+    } catch (e) { console.error("start failed", e); }
+    setLoading(false);
+  };
 
- const handleNo = async (kw) => {
- setLevels((prev) => {
- const last = { ...prev[prev.length - 1] };
- last.rejectedIds = [...last.rejectedIds, kw.id];
- last.currentIndex = last.currentIndex + 1;
- return [...prev.slice(0, -1), last];
- });
+  const handleNo = async (kw) => {
+    setLevels((prev) => {
+      const last = { ...prev[prev.length - 1] };
+      last.rejectedIds = [...last.rejectedIds, kw.id];
+      last.currentIndex = last.currentIndex + 1;
+      return [...prev.slice(0, -1), last];
+    });
 
- setLoading(true);
- const newChoices = [...choices, { question: kw.question, label: kw.label, answer: "no" }];
- setChoices(newChoices);
- await refreshAnalysis(newChoices);
- setLoading(false);
+    setLoading(true);
+    const newChoices = [...choices, { question: kw.question, label: kw.label, answer: "no" }];
+    setChoices(newChoices);
+    await refreshAnalysis(newChoices);
+    setLoading(false);
 
- await maybeTriggerConclusion(newChoices);
- };
+    await maybeTriggerConclusion(newChoices);
+  };
 
- const handleYes = async (kw) => {
- setLevels((prev) => {
- const last = { ...prev[prev.length - 1] };
- last.chosenId = kw.id;
- return [...prev.slice(0, -1), last];
- });
+  const handleYes = async (kw) => {
+    setLevels((prev) => {
+      const last = { ...prev[prev.length - 1] };
+      last.chosenId = kw.id;
+      return [...prev.slice(0, -1), last];
+    });
 
- setLoading(true);
- const newChoices = [...choices, { question: kw.question, label: kw.label, answer: "yes" }];
- setChoices(newChoices);
- setAnalysisLoading(true);
+    setLoading(true);
+    const newChoices = [...choices, { question: kw.question, label: kw.label, answer: "yes" }];
+    setChoices(newChoices);
+    setAnalysisLoading(true);
 
- try {
- const newPath = [...(currentLevel?.pathLabels || []), kw.label];
- const newAsked = newChoices.map((c) => c.question);
- const [analysisText, kws] = await Promise.all([
- fetchAnalysis(problem, newChoices),
- fetchKeywords(problem, newPath, newAsked),
- ]);
- setAnalysis(analysisText);
- setLevels((prev) => [...prev, {
- parentLabel: kw.label,
- parentQuestion: kw.question,
- parentTooltip: kw.tooltip,
- parentSource: "ai",
- isRoot: false,
- keywords: kws,
- currentIndex: 0,
- rejectedIds: [],
- chosenId: null,
- pathLabels: newPath,
- }]);
- } catch (e) { console.error("yes failed", e); }
+    try {
+      const newPath = [...(currentLevel?.pathLabels || []), kw.label];
+      const newAsked = newChoices.map((c) => c.question);
+      const [analysisText, kws] = await Promise.all([
+        fetchAnalysis(problem, newChoices),
+        fetchKeywords(problem, newPath, newAsked),
+      ]);
+      setAnalysis(analysisText);
+      setLevels((prev) => [...prev, {
+        parentLabel: kw.label,
+        parentQuestion: kw.question,
+        parentTooltip: kw.tooltip,
+        parentSource: "ai",
+        isRoot: false,
+        keywords: kws,
+        currentIndex: 0,
+        rejectedIds: [],
+        chosenId: null,
+        pathLabels: newPath,
+      }]);
+    } catch (e) { console.error("yes failed", e); }
 
- setAnalysisLoading(false);
- setLoading(false);
+    setAnalysisLoading(false);
+    setLoading(false);
 
- await maybeTriggerConclusion(newChoices);
- };
+    await maybeTriggerConclusion(newChoices);
+  };
 
- const handleExploreMore = async (text) => {
- setConclusionOpen(false);
- const trimmed = (text || "").trim();
- if (!trimmed) return;
+  const handleExploreMore = async (text) => {
+    setConclusionOpen(false);
+    const trimmed = (text || "").trim();
+    if (!trimmed) return;
 
- const label = shortLabel(trimmed);
- const newChoices = [
- ...choices,
- { question: trimmed, label, answer: "added" },
- ];
- setChoices(newChoices);
+    const label = shortLabel(trimmed);
+    const newChoices = [
+      ...choices,
+      { question: trimmed, label, answer: "added" },
+    ];
+    setChoices(newChoices);
 
- setLoading(true);
- setAnalysisLoading(true);
+    setLoading(true);
+    setAnalysisLoading(true);
 
- try {
- const newPath = [...(currentLevel?.pathLabels || []), label];
- const newAsked = newChoices.map((c) => c.question);
- const [analysisText, kws] = await Promise.all([
- fetchAnalysis(problem, newChoices),
- fetchKeywords(problem, newPath, newAsked),
- ]);
- setAnalysis(analysisText);
- setLevels((prev) => [
- ...prev,
- {
- parentLabel: label,
- parentQuestion: trimmed,
- parentTooltip: "your own direction — exploring further from here",
- parentSource: "user",
- isRoot: false,
- keywords: kws,
- currentIndex: 0,
- rejectedIds: [],
- chosenId: null,
- pathLabels: newPath,
- },
- ]);
- } catch (e) {
- console.error("explore more failed", e);
- }
+    try {
+      const newPath = [...(currentLevel?.pathLabels || []), label];
+      const newAsked = newChoices.map((c) => c.question);
+      const [analysisText, kws] = await Promise.all([
+        fetchAnalysis(problem, newChoices),
+        fetchKeywords(problem, newPath, newAsked),
+      ]);
+      setAnalysis(analysisText);
+      setLevels((prev) => [...prev, {
+        parentLabel: label,
+        parentQuestion: trimmed,
+        parentTooltip: "your own direction — exploring further from here",
+        parentSource: "user",
+        isRoot: false,
+        keywords: kws,
+        currentIndex: 0,
+        rejectedIds: [],
+        chosenId: null,
+        pathLabels: newPath,
+      }]);
+    } catch (e) { console.error("explore more failed", e); }
 
- setAnalysisLoading(false);
- setLoading(false);
+    setAnalysisLoading(false);
+    setLoading(false);
 
- await maybeTriggerConclusion(newChoices);
- };
+    await maybeTriggerConclusion(newChoices);
+  };
 
- const handleReopen = (kw) => {
- setLevels((prev) => {
- const last = { ...prev[prev.length - 1] };
- last.rejectedIds = last.rejectedIds.filter((id) => id !== kw.id);
- const idx = last.keywords.findIndex((k) => k.id === kw.id);
- const arr = [...last.keywords];
- const [item] = arr.splice(idx, 1);
- arr.splice(last.currentIndex, 0, item);
- last.keywords = arr;
- return [...prev.slice(0, -1), last];
- });
- };
+  const handleReopen = (kw) => {
+    setLevels((prev) => {
+      const last = { ...prev[prev.length - 1] };
+      last.rejectedIds = last.rejectedIds.filter((id) => id !== kw.id);
+      const idx = last.keywords.findIndex((k) => k.id === kw.id);
+      const arr = [...last.keywords];
+      const [item] = arr.splice(idx, 1);
+      arr.splice(last.currentIndex, 0, item);
+      last.keywords = arr;
+      return [...prev.slice(0, -1), last];
+    });
+  };
 
- // auto-refetch when all current keywords are rejected
- useEffect(() => {
- if (loading || !currentLevel) return;
- if (currentLevel.chosenId) return;
- if (currentLevel.currentIndex < currentLevel.keywords.length) return;
- let cancelled = false;
- (async () => {
- setLoading(true);
- try {
- const more = await fetchKeywords(problem, currentLevel.pathLabels, askedQuestions);
- if (cancelled) return;
- setLevels((prev) => {
- const last = { ...prev[prev.length - 1] };
- last.keywords = [...last.keywords, ...more];
- return [...prev.slice(0, -1), last];
- });
- } catch (e) { console.error("refetch failed", e); }
- if (!cancelled) setLoading(false);
- })();
- return () => { cancelled = true; };
- // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [levels]);
+  // auto-refetch when all current keywords are rejected
+  useEffect(() => {
+    if (loading || !currentLevel) return;
+    if (currentLevel.chosenId) return;
+    if (currentLevel.currentIndex < currentLevel.keywords.length) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const more = await fetchKeywords(problem, currentLevel.pathLabels, askedQuestions);
+        if (cancelled) return;
+        setLevels((prev) => {
+          const last = { ...prev[prev.length - 1] };
+          last.keywords = [...last.keywords, ...more];
+          return [...prev.slice(0, -1), last];
+        });
+      } catch (e) { console.error("refetch failed", e); }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [levels]);
 
- const handleUndo = async () => {
- if (levels.length === 0) return;
- const last = levels[levels.length - 1];
- const canUndo = last.rejectedIds.length > 0 || levels.length > 1;
- if (!canUndo) return;
+  const handleUndo = async () => {
+    if (levels.length === 0) return;
+    const last = levels[levels.length - 1];
+    const canUndo = last.rejectedIds.length > 0 || levels.length > 1;
+    if (!canUndo) return;
 
- setLevels((prev) => {
- const lastPrev = { ...prev[prev.length - 1] };
- if (lastPrev.rejectedIds.length > 0) {
- const lastRejected = lastPrev.rejectedIds[lastPrev.rejectedIds.length - 1];
- lastPrev.rejectedIds = lastPrev.rejectedIds.slice(0, -1);
- lastPrev.currentIndex = Math.max(0, lastPrev.currentIndex - 1);
- const idx = lastPrev.keywords.findIndex((k) => k.id === lastRejected);
- if (idx > -1) {
- const arr = [...lastPrev.keywords];
- const [item] = arr.splice(idx, 1);
- arr.splice(lastPrev.currentIndex, 0, item);
- lastPrev.keywords = arr;
- }
- return [...prev.slice(0, -1), lastPrev];
- }
- if (prev.length > 1) {
- const parentLevels = prev.slice(0, -1);
- const newLast = { ...parentLevels[parentLevels.length - 1] };
- newLast.chosenId = null;
- return [...parentLevels.slice(0, -1), newLast];
- }
- return prev;
- });
+    setLevels((prev) => {
+      const lastPrev = { ...prev[prev.length - 1] };
+      if (lastPrev.rejectedIds.length > 0) {
+        const lastRejected = lastPrev.rejectedIds[lastPrev.rejectedIds.length - 1];
+        lastPrev.rejectedIds = lastPrev.rejectedIds.slice(0, -1);
+        lastPrev.currentIndex = Math.max(0, lastPrev.currentIndex - 1);
+        const idx = lastPrev.keywords.findIndex((k) => k.id === lastRejected);
+        if (idx > -1) {
+          const arr = [...lastPrev.keywords];
+          const [item] = arr.splice(idx, 1);
+          arr.splice(lastPrev.currentIndex, 0, item);
+          lastPrev.keywords = arr;
+        }
+        return [...prev.slice(0, -1), lastPrev];
+      }
+      if (prev.length > 1) {
+        const parentLevels = prev.slice(0, -1);
+        const newLast = { ...parentLevels[parentLevels.length - 1] };
+        newLast.chosenId = null;
+        return [...parentLevels.slice(0, -1), newLast];
+      }
+      return prev;
+    });
 
- const newChoices = choices.length > 0 ? choices.slice(0, -1) : choices;
- setChoices(newChoices);
- await refreshAnalysis(newChoices);
- };
+    const newChoices = choices.length > 0 ? choices.slice(0, -1) : choices;
+    setChoices(newChoices);
+    await refreshAnalysis(newChoices);
+  };
 
- const handleReset = () => {
- setProblem("");
- setSubmitted(false);
- setLevels([]);
- setLoading(false);
- setChoices([]);
- setAnalysis("");
- setAnalysisLoading(false);
- setLastConclusionAt(0);
- setConclusionOpen(false);
- setConclusionContent(null);
- setConclusionLoading(false);
- setDetailsTarget(null);
- setDetailsContent(null);
- idCounter = 0;
- };
+  const handleReset = () => {
+    setProblem("");
+    setSubmitted(false);
+    setLevels([]);
+    setLoading(false);
+    setChoices([]);
+    setAnalysis("");
+    setAnalysisLoading(false);
+    setLastConclusionAt(0);
+    setConclusionOpen(false);
+    setConclusionContent(null);
+    setConclusionLoading(false);
+    setDetailsTarget(null);
+    setDetailsContent(null);
+    idCounter = 0;
+  };
 
- const openDetails = async (kw) => {
- setDetailsTarget(kw);
- setDetailsContent(null);
- setDetailsLoading(true);
- try {
- const text = await fetchDetails(problem, pathLabels, kw);
- setDetailsContent(text);
- } catch {
- setDetailsContent("Unable to load details right now.");
- }
- setDetailsLoading(false);
- };
+  const openDetails = async (kw) => {
+    setDetailsTarget(kw);
+    setDetailsContent(null);
+    setDetailsLoading(true);
+    try {
+      const text = await fetchDetails(problem, pathLabels, kw);
+      setDetailsContent(text);
+    } catch {
+      setDetailsContent("Unable to load details right now.");
+    }
+    setDetailsLoading(false);
+  };
 
- const closeDetails = () => { setDetailsTarget(null); setDetailsContent(null); };
+  const closeDetails = () => { setDetailsTarget(null); setDetailsContent(null); };
 
- const handleInlineInsight = async (kw, text) => {
- return await fetchInsight(problem, pathLabels, kw, text);
- };
+  const handleInlineInsight = async (kw, text) => {
+    return await fetchInsight(problem, pathLabels, kw, text);
+  };
 
- const canUndo = useMemo(() => {
- if (levels.length === 0) return false;
- const last = levels[levels.length - 1];
- return last.rejectedIds.length > 0 || levels.length > 1;
- }, [levels]);
+  const canUndo = useMemo(() => {
+    if (levels.length === 0) return false;
+    const last = levels[levels.length - 1];
+    return last.rejectedIds.length > 0 || levels.length > 1;
+  }, [levels]);
 
- /* ── render ── */
+  /* ── render ── */
 
- return (
- <>
- <style>{styles}</style>
- <div className="app">
- <header className="header">
- <h1 onClick={handleReset}>Promes AI Map</h1>
- <p>describe a problem — explore it as a friendly map</p>
- {submitted && <div className="model-badge">{MODEL_LABEL}</div>}
- </header>
+  return (
+    <>
+      <style>{styles}</style>
+      <div className="app">
+        <header className="header">
+          <h1 onClick={handleReset}>Promes AI Map</h1>
+          <p>describe a problem — explore it as a friendly map</p>
+          {submitted && <div className="model-badge">{MODEL_LABEL}</div>}
+        </header>
 
- <div className="input-area">
- <div className="input-row">
- <input
- className="input-field"
- placeholder="What problem are you trying to solve?"
- value={problem}
- onChange={(e) => setProblem(e.target.value)}
- onKeyDown={(e) => e.key === "Enter" && !submitted && handleStart()}
- disabled={submitted}
- />
- {!submitted && (
- <button className="btn-primary" onClick={handleStart} disabled={!problem.trim()}>
- Map it
- </button>
- )}
- </div>
- {submitted && (
- <div className="control-row">
- <button className="btn-ghost" onClick={handleUndo} disabled={!canUndo || loading}>↶ Undo</button>
- <button className="btn-ghost" onClick={handleReset}>← New problem</button>
- </div>
- )}
- </div>
+        <div className="input-area">
+          <div className="input-row">
+            <input
+              className="input-field"
+              placeholder="What problem are you trying to solve?"
+              value={problem}
+              onChange={(e) => setProblem(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !submitted && handleStart()}
+              disabled={submitted}
+            />
+            {!submitted && (
+              <button className="btn-primary" onClick={handleStart} disabled={!problem.trim()}>
+                Map it
+              </button>
+            )}
+          </div>
+          {submitted && (
+            <div className="control-row">
+              <button className="btn-ghost" onClick={handleUndo} disabled={!canUndo || loading}>↶ Undo</button>
+              <button className="btn-ghost" onClick={handleReset}>← New problem</button>
+            </div>
+          )}
+        </div>
 
- {submitted && (
- <div className="workspace">
- <div className="map-col">
- <LayoutGroup>
- <div className="map">
- {loading && levels.length === 0 && (
- <LoadingBlock label="mapping your problem…" />
- )}
+        {submitted && (
+          <div className="workspace">
+            <div className="map-col">
+              <LayoutGroup>
+                <div className="map">
+                  {loading && levels.length === 0 && (
+                    <LoadingBlock label="mapping your problem…" />
+                  )}
 
- {levels.map((lv, i) => (
- <div className="level-wrap" key={i}>
- {i > 0 && <Connector short />}
- <LevelView
- level={lv}
- isCurrent={i === levels.length - 1}
- loading={loading && i === levels.length - 1}
- onYes={handleYes}
- onNo={handleNo}
- onDetails={openDetails}
- onInsight={handleInlineInsight}
- onReopen={handleReopen}
- />
- </div>
- ))}
+                  {levels.map((lv, i) => (
+                    <div className="level-wrap" key={i}>
+                      {i > 0 && <Connector short />}
+                      <LevelView
+                        level={lv}
+                        isCurrent={i === levels.length - 1}
+                        loading={loading && i === levels.length - 1}
+                        onYes={handleYes}
+                        onNo={handleNo}
+                        onDetails={openDetails}
+                        onInsight={handleInlineInsight}
+                        onReopen={handleReopen}
+                      />
+                    </div>
+                  ))}
 
- {loading && levels.length > 0 && levels[levels.length - 1].chosenId && (
- <>
- <Connector short />
- <LoadingBlock label="exploring deeper…" />
- </>
- )}
+                  {loading && levels.length > 0 && levels[levels.length - 1].chosenId && (
+                    <>
+                      <Connector short />
+                      <LoadingBlock label="exploring deeper…" />
+                    </>
+                  )}
 
- {levels.length > 0 && (
- <div className="footer-actions">
- <button className="btn-ghost" onClick={handleReset}>↺ Start over</button>
- </div>
- )}
- </div>
- </LayoutGroup>
- </div>
+                  {levels.length > 0 && (
+                    <div className="footer-actions">
+                      <button className="btn-ghost" onClick={handleReset}>↺ Start over</button>
+                    </div>
+                  )}
+                </div>
+              </LayoutGroup>
+            </div>
 
- <aside className="panel-col">
- <AnalysisPanel
- analysis={analysis}
- loading={analysisLoading}
- stepCount={stepCount}
- />
- </aside>
- </div>
- )}
+            <aside className="panel-col">
+              <AnalysisPanel
+                analysis={analysis}
+                loading={analysisLoading}
+                stepCount={stepCount}
+              />
+            </aside>
+          </div>
+        )}
 
- <AnimatePresence>
- {detailsTarget && (
- <DetailsModal
- keyword={detailsTarget}
- content={detailsContent}
- loading={detailsLoading}
- onClose={closeDetails}
- />
- )}
- {conclusionOpen && (
- <ConclusionModal
- problem={problem}
- choices={choices}
- content={conclusionContent}
- loading={conclusionLoading}
- onClose={() => setConclusionOpen(false)}
- onExploreMore={handleExploreMore}
- />
- )}
- </AnimatePresence>
- </div>
- <Analytics />
- </>
- );
+        <AnimatePresence>
+          {detailsTarget && (
+            <DetailsModal
+              keyword={detailsTarget}
+              content={detailsContent}
+              loading={detailsLoading}
+              onClose={closeDetails}
+            />
+          )}
+          {conclusionOpen && (
+            <ConclusionModal
+              problem={problem}
+              choices={choices}
+              content={conclusionContent}
+              loading={conclusionLoading}
+              onClose={() => setConclusionOpen(false)}
+              onExploreMore={handleExploreMore}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+      <Analytics />
+    </>
+  );
 }
 
 /* ───────────────────────── styles ───────────────────────── */
 
 const styles = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@5…
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 body{
- background:radial-gradient(1200px 600px at 50% -10%, #efefff 0%, #f8f9ff 50%, #fbfbff 100%);
- color:#1f2330;
- font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
- min-height:100vh;
- -webkit-font-smoothing:antialiased;
+  background:radial-gradient(1200px 600px at 50% -10%, #efefff 0%, #f8f9ff 50%, #fbfbff 100%);
+  color:#1f2330;
+  font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
 }
 
 .app{
- min-height:100vh;
- display:flex;flex-direction:column;align-items:center;
- padding:48px 24px 120px;
+  min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;
+  padding:48px 24px 120px;
 }
 
 /* header */
 .header{text-align:center;margin-bottom:36px}
 .header h1{
- font-family:'Plus Jakarta Sans',sans-serif;
- font-size:32px;font-weight:800;letter-spacing:-0.025em;
- background:linear-gradient(90deg,#6366f1,#8b5cf6 60%,#a855f7);
- -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
- cursor:pointer;margin-bottom:8px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:32px;font-weight:800;letter-spacing:-0.025em;
+  background:linear-gradient(90deg,#6366f1,#8b5cf6 60%,#a855f7);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  cursor:pointer;margin-bottom:8px;
 }
 .header p{font-size:14px;color:#6b7280}
 .model-badge{
- margin-top:12px;font-size:11px;color:#5b58f0;
- background:#eef0ff;padding:4px 12px;border-radius:999px;
- display:inline-block;letter-spacing:0.04em;font-weight:500;
+  margin-top:12px;font-size:11px;color:#5b58f0;
+  background:#eef0ff;padding:4px 12px;border-radius:999px;
+  display:inline-block;letter-spacing:0.04em;font-weight:500;
 }
 
 /* input */
 .input-area{width:100%;max-width:640px;margin-bottom:40px}
 .input-row{display:flex;gap:10px}
 .input-field{
- flex:1;background:#ffffff;border:1px solid #e6e8ff;border-radius:14px;
- color:#1f2330;font-family:inherit;font-size:15px;padding:14px 18px;outline:none;
- transition:border-color .2s,box-shadow .2s;
- box-shadow:0 2px 10px rgba(99,102,241,0.04);
+  flex:1;background:#ffffff;border:1px solid #e6e8ff;border-radius:14px;
+  color:#1f2330;font-family:inherit;font-size:15px;padding:14px 18px;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+  box-shadow:0 2px 10px rgba(99,102,241,0.04);
 }
 .input-field:focus{border-color:#a5a8ff;box-shadow:0 6px 22px rgba(99,102,241,0.10)}
 .input-field::placeholder{color:#9ca3af}
 .input-field:disabled{background:#fafbff;color:#6b7280;cursor:default}
 
 .btn-primary{
- background:linear-gradient(135deg,#6366f1,#8b5cf6);
- color:#fff;border:none;border-radius:14px;
- font-family:inherit;font-size:14px;font-weight:600;
- padding:14px 22px;cursor:pointer;white-space:nowrap;
- transition:transform .15s,box-shadow .2s,opacity .2s;
- box-shadow:0 6px 18px rgba(99,102,241,0.28);
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  color:#fff;border:none;border-radius:14px;
+  font-family:inherit;font-size:14px;font-weight:600;
+  padding:14px 22px;cursor:pointer;white-space:nowrap;
+  transition:transform .15s,box-shadow .2s,opacity .2s;
+  box-shadow:0 6px 18px rgba(99,102,241,0.28);
 }
 .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 10px 24px rgba(99,102,241,0.35)}
 .btn-primary:disabled{opacity:.45;cursor:default;box-shadow:none}
 .btn-primary.small{padding:10px 18px;font-size:13px;border-radius:12px}
 
 .btn-secondary{
- background:#eef0ff;color:#4f46e5;border:none;border-radius:12px;
- font-family:inherit;font-size:13px;font-weight:600;
- padding:10px 18px;cursor:pointer;transition:background .15s;
+  background:#eef0ff;color:#4f46e5;border:none;border-radius:12px;
+  font-family:inherit;font-size:13px;font-weight:600;
+  padding:10px 18px;cursor:pointer;transition:background .15s;
 }
 .btn-secondary:hover:not(:disabled){background:#e1e4ff}
 .btn-secondary:disabled{opacity:.45;cursor:default}
 
 .btn-ghost{
- background:transparent;color:#6b7280;border:1px solid #e6e8ff;
- border-radius:999px;font-family:inherit;font-size:12px;font-weight:500;
- padding:7px 14px;cursor:pointer;transition:all .15s;
+  background:transparent;color:#6b7280;border:1px solid #e6e8ff;
+  border-radius:999px;font-family:inherit;font-size:12px;font-weight:500;
+  padding:7px 14px;cursor:pointer;transition:all .15s;
 }
 .btn-ghost:hover:not(:disabled){color:#5b58f0;border-color:#c7caff;background:#fbfbff}
 .btn-ghost:disabled{opacity:.4;cursor:default}
@@ -1029,16 +1016,16 @@ body{
 
 /* workspace: map + side panel */
 .workspace{
- display:grid;
- grid-template-columns:minmax(0,1fr) 320px;
- gap:32px;
- max-width:1340px;width:100%;align-items:start;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 320px;
+  gap:32px;
+  max-width:1340px;width:100%;align-items:start;
 }
 .map-col{min-width:0;display:flex;justify-content:center}
 .panel-col{position:sticky;top:24px}
 @media (max-width:1024px){
- .workspace{grid-template-columns:1fr;gap:24px}
- .panel-col{position:static;order:-1}
+  .workspace{grid-template-columns:1fr;gap:24px}
+  .panel-col{position:static;order:-1}
 }
 
 /* map */
@@ -1052,151 +1039,162 @@ body{
 
 /* root + parent */
 .root-card{
- background:#ffffff;border:1px solid #e6e8ff;border-radius:18px;
- padding:18px 26px;max-width:560px;text-align:center;
- box-shadow:0 8px 24px rgba(99,102,241,0.06);
+  background:#ffffff;border:1px solid #e6e8ff;border-radius:18px;
+  padding:18px 26px;max-width:560px;text-align:center;
+  box-shadow:0 8px 24px rgba(99,102,241,0.06);
 }
 .tag{
- display:block;font-size:10px;color:#8b8fb8;
- letter-spacing:0.15em;text-transform:uppercase;margin-bottom:6px;font-weight:600;
+  display:block;font-size:10px;color:#8b8fb8;
+  letter-spacing:0.15em;text-transform:uppercase;margin-bottom:6px;font-weight:600;
 }
 .root-text{font-size:16px;color:#1f2330;line-height:1.5;font-weight:500}
 
 .parent-card{
- background:#ffffff;border:1px solid #e6e8ff;border-radius:16px;
- padding:14px 22px;max-width:520px;text-align:center;
- box-shadow:0 6px 18px rgba(99,102,241,0.05);
+  background:#ffffff;border:1px solid #e6e8ff;border-radius:16px;
+  padding:14px 22px;max-width:520px;text-align:center;
+  box-shadow:0 6px 18px rgba(99,102,241,0.05);
 }
 .parent-text{
- font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:700;
- color:#4f46e5;letter-spacing:-0.01em;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:700;
+  color:#4f46e5;letter-spacing:-0.01em;
 }
 .parent-sub{margin-top:4px;font-size:13px;color:#1f2330;line-height:1.45;font-weight:500}
 .parent-tooltip{margin-top:6px;font-size:12px;color:#6b7280;line-height:1.5}
 
 .parent-card.from-user{
- border-color:#a5f3fc;background:#ecfeff;
- box-shadow:0 6px 18px rgba(14,165,233,0.10);
+  border-color:#a5f3fc;background:#ecfeff;
+  box-shadow:0 6px 18px rgba(14,165,233,0.10);
 }
 .parent-card.from-user .parent-text{color:#0e7490}
 .parent-card.from-user .tag{color:#0891b2}
 
 /* row */
 .level-row{
- display:flex;align-items:center;justify-content:center;
- gap:24px;width:100%;min-height:280px;padding:8px 0 16px;flex-wrap:wrap;
+  display:flex;align-items:center;justify-content:center;
+  gap:24px;width:100%;min-height:240px;padding:8px 0 16px;flex-wrap:wrap;
 }
 .rejected-stack{
- display:flex;flex-direction:row;gap:8px;flex-wrap:wrap;
- max-width:340px;justify-content:flex-end;
+  display:flex;flex-direction:row;gap:8px;flex-wrap:wrap;
+  max-width:340px;justify-content:flex-end;
 }
 .rejected-chip{
- background:#f7f8ff;border:1px dashed #d7daff;border-radius:12px;
- padding:8px 14px;font-family:inherit;font-size:12px;font-weight:500;
- color:#8b8fb8;cursor:pointer;opacity:.85;
- transition:opacity .2s,border-color .2s;
- display:inline-flex;align-items:center;gap:6px;
+  background:#f7f8ff;border:1px dashed #d7daff;border-radius:12px;
+  padding:8px 14px;font-family:inherit;font-size:12px;font-weight:500;
+  color:#8b8fb8;cursor:pointer;opacity:.85;
+  transition:opacity .2s,border-color .2s;
+  display:inline-flex;align-items:center;gap:6px;
 }
 .rejected-chip:hover{opacity:1;border-color:#c7caff;color:#5b58f0}
 .rejected-x{font-size:10px;color:#c0c4ee}
 .rejected-label{text-decoration:line-through;text-decoration-color:#c0c4ee}
 
 /* active */
-.active-area{display:flex;align-items:center;justify-content:center;min-width:380px;min-height:280px}
+.active-area{display:flex;align-items:center;justify-content:center;min-width:380px;min-height:260px}
 .active-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:440px}
 
 .active-card{
- background:#ffffff;border:1px solid #dcdfff;border-radius:22px;
- padding:24px 26px;width:100%;position:relative;
- box-shadow:0 16px 40px rgba(99,102,241,0.14),0 4px 12px rgba(99,102,241,0.06);
- transition:opacity .2s,filter .2s;
+  background:#ffffff;border:1px solid #dcdfff;border-radius:22px;
+  padding:26px 26px;width:100%;position:relative;
+  box-shadow:0 16px 40px rgba(99,102,241,0.14),0 4px 12px rgba(99,102,241,0.06);
+  transition:opacity .2s,filter .2s;
 }
 .active-card.busy{opacity:.55;filter:grayscale(.2);pointer-events:none}
 
 .btn-info{
- position:absolute;top:14px;right:14px;
- background:transparent;border:none;color:#a5a8c5;
- cursor:pointer;padding:0;
- width:28px;height:28px;border-radius:50%;
- display:flex;align-items:center;justify-content:center;
- transition:background .15s,color .15s;
+  position:absolute;top:14px;right:14px;
+  background:transparent;border:none;color:#a5a8c5;
+  cursor:pointer;padding:0;
+  width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s,color .15s;
 }
 .btn-info:hover:not(:disabled){background:#eef0ff;color:#5b58f0}
 .btn-info:disabled{opacity:.4;cursor:default}
 .info-icon{
- display:inline-flex;align-items:center;justify-content:center;
- width:18px;height:18px;border:1.5px solid currentColor;border-radius:50%;
- font-size:11px;font-weight:700;font-style:italic;font-family:'Georgia',serif;
- line-height:1;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;border:1.5px solid currentColor;border-radius:50%;
+  font-size:11px;font-weight:700;font-style:italic;font-family:'Georgia',serif;
+  line-height:1;
 }
 
 .active-question-title{
- font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;
- color:#1f2330;margin-bottom:10px;letter-spacing:-0.015em;line-height:1.3;
- padding-right:36px;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;
+  color:#1f2330;margin-bottom:12px;letter-spacing:-0.015em;line-height:1.3;
+  padding-right:36px;
 }
-.active-desc{font-size:14px;color:#4b5165;line-height:1.6}
+.active-desc{font-size:14px;color:#4b5165;line-height:1.65}
 
-.active-actions{display:flex;gap:10px;margin-top:18px}
+.active-actions{display:flex;gap:8px;margin-top:22px;flex-wrap:wrap}
 .btn-yes{
- background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:11px;
- font-family:inherit;font-size:14px;font-weight:600;padding:11px 20px;cursor:pointer;
- transition:transform .15s,box-shadow .2s;flex:1;
- box-shadow:0 4px 12px rgba(99,102,241,0.22);
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:11px;
+  font-family:inherit;font-size:13px;font-weight:600;padding:11px 18px;cursor:pointer;
+  transition:transform .15s,box-shadow .2s;flex:1;min-width:64px;
+  box-shadow:0 4px 12px rgba(99,102,241,0.22);
 }
 .btn-yes:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 18px rgba(99,102,241,0.30)}
-.btn-yes:disabled,.btn-no:disabled{opacity:.5;cursor:default}
+.btn-yes:disabled,.btn-no:disabled,.btn-more:disabled,.btn-insight:disabled{opacity:.5;cursor:default}
 .btn-no{
- background:#ffffff;color:#6b7280;border:1px solid #e6e8ff;border-radius:11px;
- font-family:inherit;font-size:14px;font-weight:600;padding:11px 20px;cursor:pointer;
- transition:all .15s;flex:1;
+  background:#ffffff;color:#6b7280;border:1px solid #e6e8ff;border-radius:11px;
+  font-family:inherit;font-size:13px;font-weight:600;padding:11px 18px;cursor:pointer;
+  transition:all .15s;flex:1;min-width:64px;
 }
 .btn-no:hover:not(:disabled){color:#1f2330;border-color:#c7caff;background:#fbfbff}
+.btn-more{
+  background:#eef0ff;color:#4f46e5;border:none;border-radius:11px;
+  font-family:inherit;font-size:13px;font-weight:600;padding:11px 14px;cursor:pointer;
+  transition:background .15s;
+}
+.btn-more:hover:not(:disabled){background:#e1e4ff}
+.btn-insight{
+  background:#ffffff;border:1px solid #e6e8ff;border-radius:11px;
+  padding:11px 14px;cursor:pointer;font-size:15px;transition:all .15s;
+}
+.btn-insight:hover:not(:disabled){border-color:#c7caff;background:#fbfbff}
 
 .active-input-row{display:flex;gap:8px;margin-top:12px}
 .active-input{
- flex:1;background:#fbfbff;border:1px solid #e6e8ff;border-radius:11px;
- font-family:inherit;font-size:13px;color:#1f2330;
- padding:11px 14px;outline:none;transition:border-color .2s;
+  flex:1;background:#fbfbff;border:1px solid #e6e8ff;border-radius:11px;
+  font-family:inherit;font-size:13px;color:#1f2330;
+  padding:11px 14px;outline:none;transition:border-color .2s;
 }
 .active-input:focus{border-color:#a5a8ff;background:#ffffff}
 .active-input::placeholder{color:#a5a8c5;font-size:12px}
 .active-input:disabled{opacity:.5;cursor:default}
 .btn-input-submit{
- background:#eef0ff;color:#4f46e5;border:none;border-radius:11px;
- font-family:inherit;font-size:16px;font-weight:600;padding:11px 16px;
- cursor:pointer;transition:background .15s;min-width:46px;
- display:flex;align-items:center;justify-content:center;
+  background:#eef0ff;color:#4f46e5;border:none;border-radius:11px;
+  font-family:inherit;font-size:16px;font-weight:600;padding:11px 16px;
+  cursor:pointer;transition:background .15s;min-width:46px;
+  display:flex;align-items:center;justify-content:center;
 }
 .btn-input-submit:hover:not(:disabled){background:#e1e4ff}
 .btn-input-submit:disabled{opacity:.4;cursor:default}
 
 .active-insight{
- margin-top:12px;overflow:hidden;
- background:#f5f6ff;border:1px solid #d7daff;border-radius:12px;
- padding:12px 14px;
+  margin-top:12px;overflow:hidden;
+  background:#f5f6ff;border:1px solid #d7daff;border-radius:12px;
+  padding:12px 14px;
 }
 .active-insight .lbl{
- display:block;font-size:10px;color:#5b58f0;letter-spacing:0.14em;
- text-transform:uppercase;margin-bottom:6px;font-weight:600;
+  display:block;font-size:10px;color:#5b58f0;letter-spacing:0.14em;
+  text-transform:uppercase;margin-bottom:6px;font-weight:600;
 }
 .active-insight p{font-size:12.5px;color:#2a2f44;line-height:1.6}
 
 /* chosen badge */
 .chosen-badge{
- background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;
- border-radius:999px;padding:10px 18px;
- display:inline-flex;align-items:center;gap:8px;
- font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;
- box-shadow:0 8px 22px rgba(99,102,241,0.28);
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;
+  border-radius:999px;padding:10px 18px;
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;
+  box-shadow:0 8px 22px rgba(99,102,241,0.28);
 }
 .chosen-badge .check{font-size:12px;opacity:.9}
 
 /* loading */
 .dots{display:inline-flex;gap:5px;align-items:center}
 .dots span{
- width:6px;height:6px;background:#6366f1;border-radius:50%;
- animation:pulse 1.2s infinite;
+  width:6px;height:6px;background:#6366f1;border-radius:50%;
+  animation:pulse 1.2s infinite;
 }
 .dots.tiny span{width:4px;height:4px;background:#4f46e5}
 .dots span:nth-child(2){animation-delay:.2s}
@@ -1204,74 +1202,74 @@ body{
 @keyframes pulse{0%,80%,100%{opacity:.25;transform:scale(.75)}40%{opacity:1;transform:scale(1)}}
 
 .loading-block{
- display:inline-flex;align-items:center;gap:10px;
- background:#ffffff;border:1px solid #e6e8ff;border-radius:14px;
- padding:14px 20px;color:#6b7280;font-size:13px;
- box-shadow:0 4px 14px rgba(99,102,241,0.05);
+  display:inline-flex;align-items:center;gap:10px;
+  background:#ffffff;border:1px solid #e6e8ff;border-radius:14px;
+  padding:14px 20px;color:#6b7280;font-size:13px;
+  box-shadow:0 4px 14px rgba(99,102,241,0.05);
 }
 
 .footer-actions{margin-top:40px;display:flex;justify-content:center}
 
 /* analysis panel */
 .analysis-panel{
- background:#ffffff;border:1px solid #e6e8ff;border-radius:18px;
- padding:18px 18px 14px;display:flex;flex-direction:column;gap:14px;
- box-shadow:0 8px 28px rgba(99,102,241,0.06);
- width:100%;
+  background:#ffffff;border:1px solid #e6e8ff;border-radius:18px;
+  padding:18px 18px 14px;display:flex;flex-direction:column;gap:14px;
+  box-shadow:0 8px 28px rgba(99,102,241,0.06);
+  width:100%;
 }
 .panel-head{display:flex;align-items:center;justify-content:space-between}
 .panel-tag{
- font-size:10px;color:#8b8fb8;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;
+  font-size:10px;color:#8b8fb8;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;
 }
 .panel-step{
- font-size:11px;color:#4f46e5;background:#eef0ff;
- padding:3px 10px;border-radius:999px;font-weight:600;letter-spacing:.04em;
+  font-size:11px;color:#4f46e5;background:#eef0ff;
+  padding:3px 10px;border-radius:999px;font-weight:600;letter-spacing:.04em;
 }
 .panel-body{min-height:80px}
 .panel-text{font-size:13px;color:#2a2f44;line-height:1.65;white-space:pre-wrap}
 .panel-empty{font-size:12px;color:#8b8fb8;line-height:1.55;font-style:italic}
 .panel-loading{
- display:flex;align-items:center;gap:8px;
- color:#8b8fb8;font-size:12px;
+  display:flex;align-items:center;gap:8px;
+  color:#8b8fb8;font-size:12px;
 }
 .panel-loading.mini{margin-top:10px}
 .panel-footer{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid #f0f1ff}
 .panel-progress{height:4px;background:#f0f1ff;border-radius:99px;overflow:hidden}
 .panel-progress-bar{
- height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);
- border-radius:99px;transition:width .35s ease;
+  height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);
+  border-radius:99px;transition:width .35s ease;
 }
 .panel-progress-label{font-size:10px;color:#8b8fb8;letter-spacing:.06em}
 
 /* modal */
 .modal-overlay{
- position:fixed;inset:0;background:rgba(20,22,40,0.45);
- backdrop-filter:blur(6px);z-index:1000;
- display:flex;align-items:center;justify-content:center;padding:24px;
+  position:fixed;inset:0;background:rgba(20,22,40,0.45);
+  backdrop-filter:blur(6px);z-index:1000;
+  display:flex;align-items:center;justify-content:center;padding:24px;
 }
 .modal{
- background:#ffffff;border-radius:22px;width:100%;max-width:560px;
- padding:30px;position:relative;
- box-shadow:0 28px 64px rgba(20,22,40,0.22);
- max-height:88vh;overflow-y:auto;
+  background:#ffffff;border-radius:22px;width:100%;max-width:560px;
+  padding:30px;position:relative;
+  box-shadow:0 28px 64px rgba(20,22,40,0.22);
+  max-height:88vh;overflow-y:auto;
 }
 .modal.wide{max-width:640px}
 .modal-close{
- position:absolute;top:14px;right:14px;width:32px;height:32px;
- border:none;border-radius:50%;background:#f5f6ff;color:#6b7280;
- cursor:pointer;display:flex;align-items:center;justify-content:center;
- font-size:13px;transition:background .15s,color .15s;
+  position:absolute;top:14px;right:14px;width:32px;height:32px;
+  border:none;border-radius:50%;background:#f5f6ff;color:#6b7280;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:13px;transition:background .15s,color .15s;
 }
 .modal-close:hover{background:#e6e8ff;color:#1f2330}
 
 .modal-tag{
- display:inline-block;font-size:10px;color:#5b58f0;
- background:#eef0ff;padding:5px 12px;border-radius:999px;
- letter-spacing:0.14em;text-transform:uppercase;font-weight:600;margin-bottom:12px;
+  display:inline-block;font-size:10px;color:#5b58f0;
+  background:#eef0ff;padding:5px 12px;border-radius:999px;
+  letter-spacing:0.14em;text-transform:uppercase;font-weight:600;margin-bottom:12px;
 }
 .modal-title{
- font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;
- color:#1f2330;margin-bottom:6px;letter-spacing:-0.02em;line-height:1.25;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;
+  color:#1f2330;margin-bottom:6px;letter-spacing:-0.02em;line-height:1.25;
 }
 .modal-sub{font-size:13px;color:#6b7280;margin-bottom:18px;line-height:1.5}
 .modal-body{font-size:14px;color:#2a2f44;line-height:1.75;white-space:pre-wrap}
@@ -1279,40 +1277,40 @@ body{
 .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
 
 .modal-textarea{
- width:100%;background:#fbfbff;border:1px solid #e6e8ff;border-radius:12px;
- font-family:inherit;font-size:14px;color:#1f2330;
- padding:14px;min-height:120px;outline:none;resize:vertical;
- transition:border-color .2s;
+  width:100%;background:#fbfbff;border:1px solid #e6e8ff;border-radius:12px;
+  font-family:inherit;font-size:14px;color:#1f2330;
+  padding:14px;min-height:120px;outline:none;resize:vertical;
+  transition:border-color .2s;
 }
 .modal-textarea:focus{border-color:#a5a8ff}
 
 .insight-block{
- background:#fbfbff;border:1px solid #e6e8ff;border-radius:12px;
- padding:14px 16px;margin-bottom:12px;
+  background:#fbfbff;border:1px solid #e6e8ff;border-radius:12px;
+  padding:14px 16px;margin-bottom:12px;
 }
 .insight-block.insight{border-color:#d7daff;background:#f5f6ff}
 .lbl{
- display:block;font-size:10px;color:#8b8fb8;letter-spacing:0.14em;
- text-transform:uppercase;margin-bottom:8px;font-weight:600;
+  display:block;font-size:10px;color:#8b8fb8;letter-spacing:0.14em;
+  text-transform:uppercase;margin-bottom:8px;font-weight:600;
 }
 .insight-block p{font-size:13px;color:#2a2f44;line-height:1.65}
 
 /* conclusion specifics */
 .conclusion-body{
- font-size:14px;color:#2a2f44;line-height:1.75;
- background:#fbfbff;border:1px solid #e6e8ff;border-radius:14px;
- padding:18px 20px;margin-bottom:18px;white-space:pre-wrap;
+  font-size:14px;color:#2a2f44;line-height:1.75;
+  background:#fbfbff;border:1px solid #e6e8ff;border-radius:14px;
+  padding:18px 20px;margin-bottom:18px;white-space:pre-wrap;
 }
 .conclusion-question{
- font-family:'Plus Jakarta Sans',sans-serif;
- font-size:17px;font-weight:700;
- color:#2563eb;
- margin:10px 0 14px;
- line-height:1.4;
- letter-spacing:-0.01em;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:17px;font-weight:700;
+  color:#2563eb;
+  margin:10px 0 14px;
+  line-height:1.4;
+  letter-spacing:-0.01em;
 }
 .explore-hint{
- margin-top:10px;font-size:11px;color:#0891b2;text-align:right;
- letter-spacing:.04em;font-style:italic;
+  margin-top:10px;font-size:11px;color:#0891b2;text-align:right;
+  letter-spacing:.04em;font-style:italic;
 }
 `;
