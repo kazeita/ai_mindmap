@@ -1,4 +1,4 @@
-const TONE = `Tone: friendly, fun, and slightly hilarious — like a sharp, warm friend who makes problem-solving feel light. Be human, never robotic. Stay USER-CENTRIC: write for a real person living with this problem, not for an engineer or scientist. Avoid technical jargon unless the user's problem is itself clearly technical (e.g. coding, infra, devices). Match the user's language.`;
+const TONE = `Tone: friendly, fun, and slightly hilarious — like a sharp, warm friend who makes problem-solving feel light. Be human, never robotic. Stay USER-CENTRIC: write for a real person liv[...]
 
 const PROMPTS = {
  keywords: `${TONE}
@@ -20,7 +20,7 @@ Example for a non-technical problem:
 
  analysis: `${TONE}
 
-Based on the user's problem and their yes/no answers so far, write a short, warm "current analysis" (3 to 5 sentences) summarising what you are piecing together and where things look like they are heading. Speak directly to the user, like a smart friend. Keep it user-centric. No bullets, no headers — just one cheerful little paragraph.`,
+Based on the user's problem and their yes/no answers so far, write a short, warm "current analysis" (3 to 5 sentences) summarising what you are piecing together and where things look like they are[...]
 
  conclusion: `${TONE}
 
@@ -28,7 +28,7 @@ Based on the user's problem and their yes/no choices (plus any custom directions
 
 1) A short summary paragraph (2 to 3 sentences) of what you have narrowed down. Warm and human.
 
-2) A practical step-by-step solution as a numbered list (3 to 6 concrete steps they can actually do today). Plain numbered lines like "1. ...", "2. ...". Each step should be something a regular person — not an expert — can do.
+2) A practical step-by-step solution as a numbered list (3 to 6 concrete steps they can actually do today). Plain numbered lines like "1. ...", "2. ...". Each step should be something a regular pe[...]
 
 Don't add other sections or headings. Stay user-centric. No technical jargon unless the user's problem is technical.`,
 
@@ -41,7 +41,7 @@ The user just saw a diagnostic conclusion with a step-by-step plan and is replyi
 
  details: `${TONE}
 
-Explain a single diagnostic question in the context of a user's problem. Write a warm, plain-language explanation of roughly 200 words (180 to 220). Cover: what this typically looks like in everyday life, what to look at first, and how to confirm or rule it out. Use 2 or 3 short paragraphs. No bullets. No jargon unless the problem itself is technical.`,
+Explain a single diagnostic question in the context of a user's problem. Write a warm, plain-language explanation of roughly 200 words (180 to 220). Cover: what this typically looks like in everyd[...]
 
  insight: `${TONE}
 
@@ -109,12 +109,4 @@ export default async function handler(req, res) {
  console.error("[error]", kind, err);
  res.status(500).json({ error: { message: "Upstream failure" } });
  }
-} const data = await response.json();
- console.log("[response]", kind, response.status);
-
- res.status(response.status).json(data);
- } catch (err) {
- console.error("[error]", kind, err);
- res.status(500).json({ error: { message: "Upstream failure" } });
- }
- }
+}
