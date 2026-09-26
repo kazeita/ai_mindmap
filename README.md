@@ -67,6 +67,21 @@ The app uses a priority list of models:
 
 It automatically falls back to the next model on rate limits or errors.
 
+## Draft Board (second tab)
+
+The site now has two tabs: **AI Map** (`/`, the app above) and **Draft Board** (`/draft-board`).
+
+Draft Board splits a pickup group (futsal, basketball, badminton, office nights) into fair teams:
+
+- Paste the roster from your group chat, give rough 1–5 tiers (or pass the phone so everyone rates the others privately)
+- Balances skill, keep-apart/together rules, positions (e.g. one keeper per team), newcomers and teammate rotation
+- Ratings with uncertainty (OpenSkill-style) learn from every logged result
+- Copy teams for the group chat or share a read-only link (names only)
+- A blind **fairness test** mixes in random splits and shows, per method, whether Draft Board games really are closer
+
+Everything is stored in the browser; there is no backend and no AI call. Run the engine tests with `npm test`.
+Decision record, kill criteria and roadmap: [docs/draft-board.md](docs/draft-board.md).
+
 ## License
 
 MIT
