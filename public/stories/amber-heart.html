@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Amber Heart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Spectral:ital,wght@0,400;0,500;1,400&family=Caveat:wght@500;600&display=swap">
+<style>
+:root{
+  --ground:#e9ecf0;      /* ash paper */
+  --page:#f5f6f8;
+  --ink:#1d2330;
+  --ink-soft:#4c5566;
+  --rule:#c9ced8;
+  --amber:#b8741a;       /* the dragon's gem */
+  --amber-soft:#e7c48c;
+  --lapis:#2e4c86;       /* Elaina's eyes */
+  --silver:#7d8aa3;
+  --dark-band:#1a2030;
+  --dark-band-ink:#e6e9f0;
+  --fleck:#c98a2a;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#10131b; --page:#161a24; --ink:#e4e7ee; --ink-soft:#a3abbb;
+    --rule:#2c3342; --amber:#e3a24a; --amber-soft:#6d4a1c; --lapis:#8fb0ea;
+    --silver:#8d9ab2; --dark-band:#0a0c12; --dark-band-ink:#e6e9f0; --fleck:#e3a24a;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#10131b; --page:#161a24; --ink:#e4e7ee; --ink-soft:#a3abbb;
+  --rule:#2c3342; --amber:#e3a24a; --amber-soft:#6d4a1c; --lapis:#8fb0ea;
+  --silver:#8d9ab2; --dark-band:#0a0c12; --dark-band-ink:#e6e9f0; --fleck:#e3a24a;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"Spectral",Georgia,"Times New Roman",serif;
+  font-size:1.125rem;
+  line-height:1.72;
+  padding-inline:16px;
+  padding-block:0 64px;
+}
+.wrap{max-width:40rem;margin-inline:auto}
+
+/* ---------- Hero ---------- */
+.hero{position:relative;padding-block:72px 40px;text-align:left;overflow:hidden}
+.hero canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.55}
+.hero-inner{position:relative}
+.eyebrow{
+  font-family:"IM Fell English SC",Georgia,serif;
+  letter-spacing:.14em;font-size:.95rem;color:var(--lapis);margin:0 0 12px;
+}
+h1{
+  font-family:"IM Fell English",Georgia,serif;font-weight:400;
+  font-size:clamp(3rem,11vw,5.6rem);line-height:.95;margin:0;
+  text-wrap:balance;letter-spacing:-.01em;
+}
+h1 em{font-style:italic;color:var(--amber)}
+.lede{font-style:italic;color:var(--ink-soft);max-width:32rem;margin:22px 0 0;font-size:1.15rem}
+
+/* route: the real sequence of places */
+.route{margin-top:40px;border-top:1px solid var(--rule);padding-top:18px}
+.route-label{font-family:"IM Fell English SC",serif;letter-spacing:.12em;font-size:.85rem;color:var(--ink-soft);margin:0 0 12px}
+.route ol{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 0;align-items:center}
+.route li{display:flex;align-items:center;font-size:.95rem}
+.route a{color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--silver);padding-bottom:1px}
+.route a:hover,.route a:focus-visible{color:var(--amber);border-color:var(--amber);outline:none}
+.route li:not(:last-child)::after{content:"";width:22px;height:1px;background:var(--silver);margin-inline:10px;opacity:.7}
+
+/* ---------- Chapters ---------- */
+.chapter{padding-block:56px 8px;border-top:1px solid var(--rule)}
+.ch-head{display:flex;gap:18px;align-items:baseline;margin-bottom:22px}
+.ch-num{font-family:"IM Fell English",serif;font-style:italic;color:var(--amber);font-size:1.6rem;line-height:1;flex:none}
+.ch-place{font-family:"IM Fell English SC",serif;letter-spacing:.12em;font-size:.82rem;color:var(--ink-soft);display:block;margin-bottom:4px}
+h2{font-family:"IM Fell English",Georgia,serif;font-weight:400;font-size:clamp(1.9rem,5.5vw,2.5rem);line-height:1.1;margin:0;text-wrap:balance}
+p{margin:0 0 1.1em}
+.chapter > p:first-of-type::first-letter,
+.chapter > .inner > p:first-of-type::first-letter{
+  font-family:"IM Fell English",serif;float:left;font-size:4.1em;line-height:.82;
+  padding:6px 10px 0 0;color:var(--amber);
+}
+.q{font-style:normal}
+.aside{font-style:italic;color:var(--ink-soft)}
+.break{text-align:center;color:var(--silver);letter-spacing:.8em;margin:28px 0;font-size:.9rem}
+
+/* Journal pages */
+.journal{
+  background:var(--page);border:1px solid var(--rule);
+  padding:22px 22px 10px;margin:28px 0 30px;border-radius:2px;
+  box-shadow:0 1px 0 var(--rule), 0 12px 24px -18px rgba(20,25,40,.35);
+}
+.journal h3{font-family:"Caveat",cursive;font-weight:600;font-size:1.55rem;color:var(--lapis);margin:0 0 6px;line-height:1.2}
+.journal p{font-family:"Caveat","Segoe Print",cursive;font-size:1.38rem;line-height:1.45;color:var(--ink)}
+.journal .day{font-family:"IM Fell English SC",serif;font-size:.8rem;letter-spacing:.12em;color:var(--amber);display:block;margin-top:6px}
+
+/* The dark turn */
+.chapter.dark{
+  background:var(--dark-band);color:var(--dark-band-ink);
+  margin-inline:-16px;padding-inline:16px;border-top:none;
+  --ink-soft:#a7afc0;--rule:#2c3342;
+}
+.chapter.dark .inner{max-width:40rem;margin-inline:auto}
+.chapter.dark .ch-place{color:#a7afc0}
+.chapter.dark .ch-num,.chapter.dark > .inner > p:first-of-type::first-letter{color:#e3a24a}
+.chapter.dark .aside{color:#a7afc0}
+
+.sheldon{border-left:2px solid var(--silver);padding-left:14px}
+
+/* Coda */
+.coda{padding-block:56px 0;border-top:1px solid var(--rule);text-align:center}
+.coda p{font-family:"IM Fell English",serif;font-style:italic;font-size:1.35rem;max-width:30rem;margin-inline:auto;color:var(--ink-soft)}
+.coda .sig{font-family:"Caveat",cursive;font-size:1.6rem;color:var(--lapis);font-style:normal;margin-top:10px}
+.credit{margin-top:36px;font-size:.85rem;color:var(--ink-soft);font-style:italic}
+
+@media (max-width:480px){
+  body{font-size:1.06rem}
+  .journal{padding:18px 16px 6px}
+  .ch-head{gap:12px}
+}
+@media (prefers-reduced-motion:reduce){ .hero canvas{display:none} }
+</style>
+</head>
+<body>
+
+
+<header class="hero">
+  <canvas id="flecks" aria-hidden="true"></canvas>
+  <div class="wrap hero-inner">
+    <p class="eyebrow">From the travel journal of Elaina, the Ashen Witch</p>
+    <h1>The <em>Amber</em> Heart</h1>
+    <p class="lede">In which a stranger rains croissants on a witch, turns out to be a dragon, and asks for back something the witch sold two years ago for a very good price.</p>
+    <nav class="route" aria-label="Chapters">
+      <p class="route-label">The road, in order</p>
+      <ol>
+        <li><a href="#bakery">The bakery</a></li>
+        <li><a href="#clouds">Above the clouds</a></li>
+        <li><a href="#estelia">Estelia</a></li>
+        <li><a href="#lighthouse">The lighthouse</a></li>
+        <li><a href="#south">The southern sky</a></li>
+        <li><a href="#valley">The singing valley</a></li>
+        <li><a href="#last">The last chapter</a></li>
+      </ol>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- I -->
+<section class="chapter" id="bakery">
+  <div class="ch-head"><span class="ch-num">I.</span><div><span class="ch-place">A market town, afternoon</span><h2>A Coincidence on the Way to the Bakery</h2></div></div>
+
+  <p>I had been in town for ten minutes. My purse was lighter than I would have liked and my stomach was emptier still, so when the smell of warm butter drifted down the street, I followed it. That was when you appeared on the road ahead of me, as if you had been waiting there.</p>
+  <p>“Such a coincidence,” you said.</p>
+  <p>I don't believe in coincidences. I believe in bakeries. I told you my name, Elaina, a traveling witch, beautiful, talented, and at that moment rather hungry. I also told you what I'd heard about this town: the bakers here only sell their best loaf to people who tell them a secret first.</p>
+  <p>You did not tell me a secret. You raised your arms, announced that you had a cake-creating spell, and cast it with far more drama than any spell requires.</p>
+  <p>For a moment nothing happened. Then the sky over the street went soft and gold, and it began to rain croissants. Sweet rolls bounced off the cobblestones. A cream puff landed squarely on my hat.</p>
+  <p class="aside">Most people who want to impress me cast fireballs. You cast breakfast.</p>
+  <p>I sent my broom up to catch loaves like a basket catching apples, and I ate the cream puff. It was good. Annoyingly good. The baker came out of his shop and stared at the sky with the face of a man watching his livelihood fall out of the clouds for free, while a little girl across the street held her apron open and laughed.</p>
+  <p>You showed no sign of stopping it, so I tapped my wand and nudged the clouds toward the pastures outside town. The cows would be confused. The baker would survive. When you tried to take the bread back, I caught your wrist. A gift is a gift, and in every country I have visited, taking one back is the height of rudeness. Some towns even have laws about it. I think. I would have made one up.</p>
+  <p>So we made a trade. I kept my bread, and I bought the tea.</p>
+  <p>The bakery was small and warm and smelled of cinnamon. The baker, still pale, gave us honey cakes “for saving my shop,” which I accepted graciously; I am very good at accepting things graciously. You kept trying to rest your arm on my shoulder. I kept reaching for the sugar at exactly the right moment. On the third attempt I simply placed a honey cake in your hand.</p>
+  <p>Then I paid what I owed. “When I first left home,” I told you, “I cried on my broom for about an hour. I told everyone it was the wind. It wasn't.” That is more than most people get from me. I asked for your secret in return.</p>
+  <p>You told me I smelled of butter. I pointed out whose fault that was, cleaned my cloak with a spell I learned at eight, and asked again.</p>
+</section>
+
+<!-- II -->
+<section class="chapter" id="clouds">
+  <div class="ch-head"><span class="ch-num">II.</span><div><span class="ch-place">Above the cloud line</span><h2>The Stranger With Wings</h2></div></div>
+
+  <p>“I'm actually a dragon,” you said, and stood up in the middle of the bakery and performed what I can only assume was a dragon dance. The baker quietly moved his trays out of range. The girl with the apron pressed her face to the window.</p>
+  <p>I have met a real dragon, in the northern mountains. It was the size of a cathedral, it slept on a heap of gold, and it tried to eat my broom. It did not dance, and it certainly did not rain croissants. Still, if you were a dragon, the day suddenly made more sense. Dragons hoard treasure. You hoarded bread. It's a kind of treasure.</p>
+  <p>You said you would tell me everything if I took you up above the clouds. A dragon asking a witch for a ride. I sighed, set rules (sit behind me, hold the broomstick and not me, no dancing in the air, warn me before turning into anything large), and took off.</p>
+  <p>We broke through a layer of cloud as fine as flour and came out into a gold sea of afternoon light. I let the broom hover and turned around.</p>
+  <p>Behind you, the air trembled, and a pair of wings unfolded. The membranes were thin as silk, the scales caught the sun, and they were wide enough to hide half of it. You held them as straight as you could, but the edge of the left one shook.</p>
+  <p>“Beautiful,” I said, more quietly than I meant to. Then I cleared my throat. “Not as beautiful as me, obviously.”</p>
+  <p>You told me you used to be able to become a whole dragon. Now the wings were all you had left. Magic doesn't simply fade, I told you. Someone takes it, or someone trades it away. Then you said the thing that made my broom dip.</p>
+  <p>“That's why I came to find you.”</p>
+  <p>So it hadn't been a coincidence. You had been waiting for me. Two years ago, you said, you dropped your dragon pearl from the sky, and it landed on me.</p>
+  <p>I closed my journal. And then, slowly, I remembered. A seaside town. I was sitting on a step eating grilled fish when something fell out of the sky and struck me exactly where I was sitting. I sat sideways for three days. At my feet lay a round, warm stone that glowed the color of amber.</p>
+  <p>“Suppose,” I said, looking very calmly at the sunset, “purely hypothetically, a beautiful witch found a lovely warm stone with no owner. And suppose she was out of money, and hungry, and sore. She might have sold it. To an antiques dealer. In the port city of Estelia. For a rather good price.”</p>
+  <p>You looked at me. Just looked, wide-eyed and silent and full of judgment.</p>
+  <p>“Don't look at me like that. I thought it was a gemstone. A gemstone that falls from the sky and hits you is, by the law of every traveler, a gift from fate.” You kept looking. “Fine. I'll help you get it back. Not because I feel guilty. Because a sad dragon circling me all day would be tiresome. And you owe me for the bruise, so we're even.”</p>
+  <p>Then you tried to name a reward, and I stopped you before you could say anything that would get you pushed off the broom. I accept gold, silver, gems, and a croissant rain every morning for the rest of the journey. You offered something else instead: a hundred years of dragon magic, poured into me, to make me twelve times stronger.</p>
+  <p>For a moment I pictured it. Crossing a continent before breakfast. Breaking a storm with a flick of my fingers. My teacher Fran calling <em>me</em> “master.” That last one was very tempting.</p>
+  <p>But I have been through too many towns. The king who wanted to live forever. The witch who traded her heart for beauty. In my journal, gifts that large always come with a price written in the smallest letters. A witch twelve times stronger would not be me. I like having to work for things. I like getting lost. I like failing now and then.</p>
+  <p>“Croissants every morning,” I said. “And when you get your power back, turn into a dragon once, for me to see. Just once.” The wind took the rest of it. “I want to write that I once flew beside a real dragon.”</p>
+</section>
+
+<!-- III -->
+<section class="chapter" id="estelia">
+  <div class="ch-head"><span class="ch-num">III.</span><div><span class="ch-place">The port city of Estelia</span><h2>Two Days West</h2></div></div>
+
+  <p>These pages are copied straight from my journal, because I was too tired to write them any better at the time.</p>
+
+  <div class="journal">
+    <span class="day">Day one</span>
+    <h3>Flew west all night.</h3>
+    <p>The dragon kept the bargain. At sunrise, a small rain of croissants over the front of the broom. I caught seven. The dragon caught two, then dropped one into the sea. A seagull followed us for the rest of the morning, hoping.</p>
+    <span class="day">Day two</span>
+    <h3>Estelia at sunset.</h3>
+    <p>Still as loud as I remember. Salt, grilled fish, and merchants working out how to cheat each other. The antiques shop is still there. So is the merchant. He looked at me, then at the wings behind the dragon, and went pale.</p>
+    <p>“The amber stone? I sold it last year. To the lighthouse keeper on the southern cape.”</p>
+    <p>Note: he sold it for three times what he paid me. I said nothing. But I wrote it down.</p>
+  </div>
+
+  <p>We flew along the coast after dark, and we saw it from far away. A lighthouse on a spur of rock, and at its top, not the ordinary yellow of a flame, but a warm amber light that swept across the black water like a hand smoothing a blanket.</p>
+</section>
+
+<!-- IV -->
+<section class="chapter" id="lighthouse">
+  <div class="ch-head"><span class="ch-num">IV.</span><div><span class="ch-place">The southern cape, then open sea</span><h2>The Lighthouse and the Price</h2></div></div>
+
+  <p>The keeper was an old man with a bent back and clouded eyes. He told us the lamp used to go out on every stormy night, and every year a ship broke apart on the reef below. His son was lost with one of them. In the two years since the stone came, not a single ship had been wrecked.</p>
+  <p>The pearl sat in a glass case at the top of the tower. I could feel it humming, the way a thing hums when it recognizes its owner. I stepped back and folded my arms. I am an observer. This was not my decision to make.</p>
+  <p>You warned me that touching it would change you back into a great dragon, all at once, with a supersonic wave of power, and “a few unpleasant things” besides. I declined to hear the details, and I pointed out that doing this at the top of an ancient stone tower, next to an old man, would begin with all three of us falling into the sea.</p>
+  <p>So I lifted the pearl out with my wand. To me it was only a hot stone. The instant it left the case, the light at the top of the tower flickered and died, and the sea went dark. The old man made a small sound.</p>
+  <p>“We'll come back,” I told him. “I promise.”</p>
+  <p>We flew out until the coast was a thread and then nothing. Only black water, stars, and the pearl beating in my palm like a heart that knew it was nearly home. When you winked and said I'd find out what the unpleasant things were when they happened, I built a barrier around myself. Then a second. Then, after some thought, a third. My teacher never actually taught me that when someone winks and says “you'll see,” you raise three barriers. She should have.</p>
+  <p>I backed away a long distance and sent the pearl floating across the dark to you. “It's yours,” I called. “Two years. Welcome home.”</p>
+  <p>The light went off like a sunrise in a jar. The wave hit my first barrier and shattered it. The second cracked. The third shook and held. The edge of my journal was a little scorched.</p>
+  <p>And where you had been, there was a dragon.</p>
+  <p>Amber scales from nose to tail, thick and bright as armor. Wings that covered half the stars. Golden eyes the size of my broom, looking down at me. I forgot that I had been about to scold you.</p>
+  <div class="journal">
+    <p>Note: real dragon. Very large. Aesthetically acceptable.</p>
+  </div>
+
+  <p>We went back to the cape at dawn. You circled the tower, spread your wings, and the sky turned gold again. This time it was not a drizzle. It was a downpour. Croissants drummed on the roof and rolled down the steps and piled up around the old man's feet. He picked one up, bit into it, and started to cry. “Just like my wife used to make,” he said, and ate another, and another, until somewhere around the nineteenth he lay back on the step with his stomach round and his face red, smiling like a child after a birthday feast.</p>
+  <p>Of all the ways to repay someone, feeding them until they pass out is, I admit, rather sweet.</p>
+  <p>Then a ship's horn sounded out in the fog, long and low, heading straight for the reef. The case at the top of the tower was empty, and croissants do not glow.</p>
+  <p>You dropped a small white flower into my hand from one enormous claw. Its petals were layered like a star.</p>
+  <p>“This is how dragons say ‘your turn, Elaina’? You're exhausting.” But I was already flying. I set the flower in the empty case and poured into it everything I had: moonlight from nights flying alone, the warmth of bakeries in towns whose names I've forgotten, and a very small amount of the warmth that was still in my palm from the pearl.</p>
+  <p>The flower lit. Not amber, but silver, soft and clear, like starlight on water. The beam swept through the fog and touched the ship's hull. The horn answered, short and urgent. The ship turned, slid past the reef with a few arm-lengths to spare, and drifted into deep water.</p>
+  <p>I sat down hard on the floor of the tower, hat crooked. “It'll shine for a long time. Not forever, but long enough. Don't think I did it for you. I just didn't want a chapter in my journal that ends in a shipwreck.”</p>
+  <p>Below, the old man slept through all of it among the croissants.</p>
+</section>
+
+<!-- V -->
+<section class="chapter" id="south">
+  <div class="ch-head"><span class="ch-num">V.</span><div><span class="ch-place">The coast road, heading south</span><h2>Beside a Dragon</h2></div></div>
+
+  <p>You bowed your head, and your golden eyes narrowed into two crescent moons. I didn't know a dragon could look that content. I took it as a yes.</p>
+  <p>We flew along the coast as the sun came up. Beside you I was a leaf flying beside a mountain. Every beat of your wings knocked my hat sideways, and every time I had to catch it. It was a nuisance. I didn't ask you to slow down.</p>
+
+  <div class="journal">
+    <p>Today I flew beside a real dragon. It is large, loud, winks at the wrong moments, and insists on paying its debts in croissants.</p>
+    <p>I once sold its pearl for dinner money. It used the same pearl to rain bread on a lonely old man. Maybe that is the difference between a witch and a dragon.</p>
+    <p>Or maybe it's just the difference between me two years ago and me now.</p>
+    <p>Anyway, the bread was very good.</p>
+  </div>
+
+  <p>I told you I was heading south, to a town where people speak only by singing, and asked, without turning around, whether you wanted to come along. Just for a while.</p>
+  <p>Your answer was to hook me off my broom with one claw, as easily as picking up a bean, and toss me into the air. I turned over once and landed flat on your back between your shoulders, hat down over one ear. My broom circled beside us, bewildered, like a small dog whose owner had left without it.</p>
+  <p>“You threw me,” I said into your scales.</p>
+  <p>Then I sat up, straightened my hat, brushed off my cloak, and looked down. From a dragon's back the world looks wider. The wind is stronger. Each wingbeat lifts the whole sky and sets it down again, like riding the wind itself. Clouds drift past at eye level, and the sea far below glitters as though someone emptied a purse of silver across it.</p>
+  <p>I didn't intend to smile. My mouth did it anyway. “I'll let the throwing go,” I said, failing entirely to sound cold. “Call it payment for the lighthouse. That way. And fly slowly. I want to look for a while.”</p>
+  <p>You laughed, and the laugh shook through your whole body. A flock of wild geese ahead of us scattered, honking what I'm sure were insults. I ate a croissant and told you to watch where you were going.</p>
+</section>
+
+<!-- VI -->
+<section class="chapter dark" id="valley">
+  <div class="inner">
+  <div class="ch-head"><span class="ch-num">VI.</span><div><span class="ch-place">A valley in the south, at dusk</span><h2>The Town That Had to Sing</h2></div></div>
+
+  <p>We heard the valley before we saw it. Hundreds of voices. A fishwife singing her prices, a guard singing the change of watch, two old men singing an argument over a chess game. It was chaotic and strangely beautiful, and I stood up on your back, holding my hat, to see.</p>
+  <p>Then the singing stopped.</p>
+  <p>It didn't fade. It snapped, like a cut string. In the square below, the fishwife still stood with her mouth open on a note, but her skin was turning grey. From her fingertips to her wrist to her shoulder to her face, stone swallowed her in less than a breath. Then the guard. Then the two old men. Then a running child, frozen mid-stride with one hand raised, pointing at the sky.</p>
+  <p>Pointing at us.</p>
+  <p>I understood, and the understanding ran down my spine like ice water. “Your wings,” I whispered. “Every beat is drowning out their voices.” They didn't sing for joy. They sang because they had to. Something in this valley turned the silent to stone, and we had brought a wind loud enough that no one could hear themselves.</p>
+  <p>A mother in the square was holding her child and singing into his ear, cracked and off-key, while the stone climbed to her knees.</p>
+  <p>“Stop flapping!” I shouted. “Glide! Land! Anything!”</p>
+  <p>We were very high. If you stopped, we would fall.</p>
+  <p>You folded your wings.</p>
+  <p>Wind screamed in my ears. My hat was gone. The ground came up like a wall, and through the roar I heard the singing below rise again, steady itself, find its rhythm. Without the wingbeats, they could hear themselves.</p>
+  <p>We hit the hillside. I was thrown clear and rolled a long way through grass and stones, and when I could sit up, my hands scraped and my cloak torn, you were lying at the end of a long gouge in the earth. One wing was bent at a wrong angle. Your scales were cracked in plates. Each breath rattled, and small sparks died in the smoke.</p>
+  <p>“Idiot,” I said, kneeling at your head with my hands shaking on the hot scales. “Idiot dragon. I only said glide.”</p>
+  <p>But I knew. Gliding wasn't fast enough. That mother didn't have the time.</p>
+  <p>Below, the song went on, but it was thin now. Too many voices had fallen silent for good, standing in the square as grey statues. The rest were singing through tears, hoarse, and no one knew how long they could hold.</p>
+  <p>I stood, pointed my wand at my own throat, and used an amplifying spell Fran had forbidden me, because it burns away the caster's voice.</p>
+  <p>“Stay down,” I told you, in my own voice for the last time that day. “My turn.”</p>
+  <p>I am not a good singer. I have never sung in front of anyone. My voice rang across the valley like a cathedral bell, shaky and off-key, and my throat burned from the first note as though I'd swallowed coals.</p>
+  <p>Behind me, you were smiling, a crooked, fanged smile with blood at the corner of your mouth. Then you lifted your head, drew a breath so deep I heard your ribs creak, and sang with me.</p>
+  <p>A dragon's voice is so low the ground shakes. It had no words and no melody I knew, but it carried my voice further, caught the notes I dropped, and lifted them like a wing lifting a leaf. Our song poured down into the valley like a wave, and below, one by one, the townspeople caught the rhythm and stood up inside it. The song grew full again, strong, in unison.</p>
+  <p>The mother was still standing in the square. The stone had reached her chest. It stopped. Then, very slowly, it began to recede.</p>
+  <p>I sang until my throat made no sound at all, then sank down beside you with my back against your broken scales. I opened my mouth to scold you and nothing came out.</p>
+  <p>That was when I felt it, through the earth and your scales and my own back. A tremor from somewhere far beneath the valley. As if something that had slept a very long time had just been woken by a dragon's song.</p>
+
+  <p class="break" aria-hidden="true">✦ ✦ ✦</p>
+
+  <p>Your scales slid away under me like running sand. When I sat up, the dragon was gone, and in its place was a girl curled in the torn earth, shaking and scraped raw. I didn't think. I took off my black cloak and wrapped it around you from head to foot and pulled it tight. It was torn and filthy, but it was thick and it was warm. I had just enough magic left to stop the bleeding along your arm. Not to heal it. Just that.</p>
+  <p>The ground shook harder. In the square, among the statues, the paving split open into a black crack that kept widening, and from it rose a sound. Not a roar. A hum, low and soft, matching exactly the last note you had sung, as if something down there was answering you.</p>
+  <p>Then the air in front of me tore open like paper, and a tall, thin man stepped through it, wearing a T-shirt with a lightning bolt on it under a striped long-sleeved shirt. He looked at the valley, the crack, you, and me, with the expression of a scientist whose experiment has produced the wrong result.</p>
+  <div class="sheldon">
+    <p>“So this is the singularity on the graph,” he said, taking out a notebook. “A region where sound determines the state of matter. Physically impossible. Fascinating.” Then, to us, chin raised: “Do you need instant medical aid from my newly developed secret machine? I ask as a formality. The answer is obviously yes.”</p>
+  </div>
+  <p>You recognized him. Sheldon Cooper. You had helped him deflect a meteor with NASA the year before, you said. He corrected your pronunciation of his name, then corrected your version of events: he had calculated the three-point-seven-degree deflection, so strictly speaking you had helped him.</p>
+  <p>I wrote one word in my journal in very large letters and held it up. <em>METEOR???</em> No one answered me.</p>
+  <p>He pulled out a machine the size of a cake box, all blinking lights and tangled wire, and a blue beam passed over you. Scratches closed. The rattle in your chest quieted. “Quantum resonance tissue reconstruction,” he announced, unprompted. “I intended to win a Nobel Prize with it. Instead I'm using it on a dragon without a wardrobe. The universe is ironic.” The beam swept over my throat, and I swallowed and found a rasp of a voice, like sandpaper.</p>
+  <p>Then a stone hand the size of a house gripped the edge of the chasm.</p>
+  <p>A second hand. Then a head. It rose from the earth like a mountain standing up, and when the sunset caught it, I saw what it was made of. Statues. Hundreds, thousands of them. Everyone who had ever fallen silent in this valley, over hundreds of years, limbs locked together, faces jutting from its shoulders and chest, every mouth open on a note. And the shape they made had two wings, a long tail, and a head with curved horns.</p>
+  <p>“It looks like you,” I whispered.</p>
+  <p>It turned its empty eye sockets toward us and hummed your last note again, like someone calling a name. Sheldon backed away three steps, hugging his machine. “A basic survival principle: when an enormous entity made of people calls your name, consider not answering.”</p>
+  <p>Under my cloak, an amber light flared. The pearl. It was burning so hot I had to pull my hand back, and it rose out of you, drifting down toward the valley as if on an invisible thread. In the middle of the stone dragon's chest, where the heart should be, there was a round, empty hollow, exactly the size of the pearl.</p>
+  <p>The pieces fell into place, and they were cold. “It was never yours,” I said. “It fell from the sky two years ago. You said you dropped it. You never said where it came from. It's that dragon's heart. Someone took it, and without a heart, it could only swallow whoever fell silent, trying to fill the hole.”</p>
+  <p>“So technically,” said Sheldon, “the valley's curse is a deficiency disorder.”</p>
+  <p>You could still have reached out and caught it. If you kept it, you would lose your dragon form again, maybe forever. If you let it go, no one knew what the stone dragon would do with a heart, or whether the people inside it would be freed or sealed in for good. I looked at you and said nothing. It wasn't mine to decide.</p>
+  <p>You decided. You asked Sheldon to calculate a trajectory, because you meant to hit the stone dragon like a bullet, and you would have exactly one chance.</p>
+  <p>Sheldon snatched my journal without asking and filled a page with numbers, curves, and a terrible drawing of a dragon. “Distance, four hundred and twelve meters. Angle of approach, nineteen degrees, one point two left for the valley wind. Not the chest; the ribs are made of, well, people. The gap under the jaw, where two layers of statues don't meet. You need a starting speed of at least a hundred and eighty meters per second, and you'll have to carry the pearl in and set it in the heart from inside.” He paused, and for the first time he didn't sound pleased with himself. “Probability of success, thirty-one percent. Probability of you getting back out afterward, I didn't calculate. I don't want to know.”</p>
+  <p>I took the journal back and whistled, hoarsely. My broom, which had been lying in the grass, flew over and hovered in front of you. “You can't reach a hundred and eighty on your own. My broom can, if I burn everything I have left.” My hands were shaking. I hated that they were shaking. “I don't interfere in other people's business. It's a rule. But you owe me croissants every morning, and I don't like being stiffed. So you come back. Understood?”</p>
+  <p>Sheldon began to count. “Three.”</p>
+  <p>You pulled me close before I could react and kissed me. A moment only: warm, salty with tears, over almost before it started. Then you let go. “The time I spent flying with you was a lot of fun,” you said.</p>
+  <p>“Two,” said Sheldon, and turned around, muttering that the scientific method did not require an audience.</p>
+  <p>I heard it. <em>Was.</em> Past tense, the way people talk at city gates when they know they aren't coming back. And the first thing that came back to me was not embarrassment. It was anger.</p>
+  <p>“Don't,” I said, gripping the edge of the cloak at your shoulder, my voice cracked but every word clear. “Don't use the past tense with me. I keep the journal. I decide when a chapter ends.” I pushed the broom handle into your hands, set my wand against it, and poured in everything I had. Silver light ran down the shaft like fire along a fuse. My knees gave way. My vision went dark at the edges. “What just happened, I'll settle with you later. So you have to come back and answer for it.”</p>
+  <p>“One.”</p>
+  <p>The broom shrieked like a silver arrow, and you were gone from the hillside. I fell to the ground. The last thing I saw was a streak of silver cutting across the valley toward the stone jaw, carrying a tiny point of amber ahead of it.</p>
+  <p>Then everything went white.</p>
+  </div>
+</section>
+
+<!-- VII -->
+<section class="chapter" id="last">
+  <div class="ch-head"><span class="ch-num">VII.</span><div><span class="ch-place">The same hillside</span><h2>I Decide When the Chapter Ends</h2></div></div>
+
+  <p>Somewhere far off, Sheldon was shouting. He had worked out your falling speed, and your path ran straight into a spur of sharp rock at the rim of the valley.</p>
+  <p>So I stood up.</p>
+  <p>I don't know how. My legs had no feeling, my magic was spent to the last drop, and my wand was just a stick of wood. But when Sheldon shouted the number, I was on my feet.</p>
+  <p>Down in the valley, the white light was thinning. The stone dragon stood motionless, and in its chest a point of amber was beating. Thump. Thump. Like a heart. Plates of stone began to peel from it and fall, and every piece that struck the ground was a person, coughing, bewildered, and alive. Hundreds of them. Thousands.</p>
+  <p>And you were falling. A small dark shape thrown clear of the blast, tumbling through the air with no wings and no broom, straight at that spur of rock.</p>
+  <p>I had no magic. But I had one thing. I tore the star-shaped brooch from my collar. Fran's brooch. The day I left home she pinned it on me and said, in her usual peculiar way, that there was a spell inside it for “the stupidest day of your life.” I always thought she was joking.</p>
+  <p>I crushed it in my fist.</p>
+  <p>A gust like stardust burst out and wrapped around me and threw me off the ground. No broom, no spell of my own, just my teacher's star-wind pushing me forward. I reached. Further. Further. The rock came up at us.</p>
+  <p>My hand closed on you.</p>
+  <p>I pulled and twisted and we hit the slope one arm's length from the rock and rolled, and rolled, through grass and gravel, until we stopped at the bottom of the hill in a heap of torn cloak and scrapes and stardust going out around us like embers.</p>
+  <p>I lay on my back and looked at the sky. Sunset. Unreasonably beautiful. From somewhere up the hill, Sheldon's voice: “All right, that one wasn't on the graph either!”</p>
+  <p>I turned my head. You were right there. “See?” I whispered, with the last of my breath. “I decide when the chapter ends.”</p>
+
+  <p class="break" aria-hidden="true">✦ ✦ ✦</p>
+
+  <p>When you opened your eyes, the first thing you saw was my face, very close. Ash-grey hair full of grass, a long scratch across one cheek, and red eyes. I stared at you for one second. Two. Then I let out a long, shaking breath, as if I'd been holding it since the moment you flew.</p>
+  <p>“Late,” I whispered. “You're very late. I'd already started your eulogy. It was terrible. It was all about croissants.” I turned away and wiped my eyes with the back of my hand and pretended I was brushing off dust.</p>
+  <p>Behind me the valley was coming back to life. People calling to each other. Someone crying. A child laughing. And nobody was singing. For the first time in hundreds of years, the valley could be quiet without being afraid.</p>
+  <p>In the middle of the square, the stone dragon was much smaller now, curled up on the paving. It wasn't grey anymore. Its scales were slowly turning amber, just like yours. It lifted its head, looked toward us, and hummed one very gentle note.</p>
+  <p>Sheldon appeared at the top of the slope, clutching his machine, breathing hard, his striped shirt covered in mud. “I have three things to say. One, you both violate every law I know. Two, I'm going to write a paper about this and no one will believe me. Three…” He hesitated and looked away. “I'm glad nobody died. Don't tell anyone I said that.”</p>
+  <p>I turned back to you, eyes narrowed, half angry and half not, and poked one finger into your forehead. “You still owe me croissants. And an explanation. About… earlier.” My ears went red, and I hated that they went red. “But later. Right now I want to sleep for three days.”</p>
+</section>
+
+<section class="coda">
+  <p>Somewhere in the south there is a valley where people speak instead of sing, a small amber dragon asleep in the square, and on a cape by the sea, a lighthouse that shines silver.</p>
+  <p class="sig">— E.</p>
+  <p class="credit">A story told together on a Sunday afternoon: you as the dragon, Claude as the witch. Fan fiction inspired by <em>Wandering Witch: The Journey of Elaina</em>.</p>
+</section>
+
+</main>
+
+<script>
+(function(){
+  var c=document.getElementById('flecks');
+  if(!c||!c.getContext) return;
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var ctx=c.getContext('2d'),w,h,dpr=Math.min(window.devicePixelRatio||1,2),pts=[];
+  function color(){return getComputedStyle(document.documentElement).getPropertyValue('--fleck').trim()||'#c98a2a';}
+  function size(){var r=c.getBoundingClientRect();w=r.width;h=r.height;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
+  function seed(){pts=[];var n=Math.round(w/14);for(var i=0;i<n;i++)pts.push({x:Math.random()*w,y:Math.random()*h,r:.6+Math.random()*1.8,s:.15+Math.random()*.45,d:Math.random()*Math.PI*2});}
+  function draw(){ctx.clearRect(0,0,w,h);ctx.fillStyle=color();for(var i=0;i<pts.length;i++){var p=pts[i];ctx.globalAlpha=.35+.5*Math.abs(Math.sin(p.d));ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();}}
+  function step(){for(var i=0;i<pts.length;i++){var p=pts[i];p.y+=p.s;p.d+=.01;p.x+=Math.sin(p.d)*.25;if(p.y>h+4){p.y=-4;p.x=Math.random()*w;}}draw();requestAnimationFrame(step);}
+  size();seed();draw();
+  window.addEventListener('resize',function(){size();seed();draw();});
+  if(!reduce) requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>
