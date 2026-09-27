@@ -5,6 +5,7 @@ import AppV2 from './AppV2.jsx'
 import SiteTabs, { TABS, tabForPath } from './SiteTabs.jsx'
 
 const DraftBoard = lazy(() => import('./draft-board/DraftBoard.jsx'))
+const EndlessWay = lazy(() => import('./stories/EndlessWay.jsx'))
 
 const path = window.location.pathname
 const isV1 = path === '/v1' || path.startsWith('/v1/')
@@ -53,6 +54,18 @@ function Site() {
           <Suspense fallback={<p className="site-loading">Loading Draft Board…</p>}>
             <DraftBoard />
           </Suspense>
+        )}
+      </div>
+      <div className="site-view" hidden={active !== 'endless'}>
+        {visited.has('endless') && (
+          <Suspense fallback={<p className="site-loading">Loading…</p>}>
+            <EndlessWay />
+          </Suspense>
+        )}
+      </div>
+      <div className="site-view" hidden={active !== 'amber'}>
+        {visited.has('amber') && (
+          <iframe className="site-story-frame" src="/stories/amber-heart.html" title="The Amber Heart" />
         )}
       </div>
     </>

@@ -82,6 +82,11 @@ Draft Board splits a pickup group (futsal, basketball, badminton, office nights)
 Everything is stored in the browser; there is no backend and no AI call. Run the engine tests with `npm test`.
 Decision record, kill criteria and roadmap: [docs/draft-board.md](docs/draft-board.md).
 
+## Stories (third and fourth tabs)
+
+- **Endless Way** (`/endless-way`): the text lives in [`src/stories/endless-way.txt`](src/stories/endless-way.txt), plain text you can edit directly. The first line is the title, paragraphs are separated by a blank line, and a paragraph that is only `〇`, `⁂` or `* * *` becomes a scene break.
+- **The Amber Heart** (`/amber-heart`): a standalone page at [`public/stories/amber-heart.html`](public/stories/amber-heart.html), shown inside the site.
+
 ## License
 
 MIT

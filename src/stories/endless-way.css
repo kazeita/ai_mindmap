@@ -1,0 +1,12 @@
+.ew{
+  max-width:38rem;margin:0 auto;padding:0 16px 80px;
+  font-family:'Lora',Georgia,serif;font-size:1.1rem;line-height:1.75;color:#1f2a26;
+}
+.ew-head{padding:64px 0 32px;margin-bottom:32px;border-bottom:1px solid #d9dde8}
+.ew-eyebrow{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.15rem;color:#3f7a64;margin:0 0 8px}
+.ew h1{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:clamp(3rem,11vw,5rem);line-height:.95;letter-spacing:-.01em;color:#1f2a26}
+.ew-road{margin-top:24px;height:2px;border-radius:2px;background:linear-gradient(90deg,#3f7a64,transparent)}
+.ew p{margin:0 0 1em}
+.ew-head + p::first-letter{font-family:'Cormorant Garamond',serif;float:left;font-size:4em;line-height:.8;padding:6px 10px 0 0;color:#3f7a64}
+.ew .ew-break{text-align:center;color:#3f7a64;letter-spacing:.4em;margin:36px 0}
+.ew-foot{margin-top:56px;padding-top:24px;border-top:1px solid #d9dde8;text-align:center;font-style:italic;font-size:.9rem;color:#56645e}
