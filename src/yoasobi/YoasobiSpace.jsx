@@ -1,127 +1,159 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ARTIST_ID, RELEASES } from "./releases.js";
 import "./yoasobi.css";
 
-const embed = (type, id) => `https://open.spotify.com/embed/${type}/${id}?utm_source=generator&theme=0`;
+const BOXES = [
+  ...RELEASES.map((r) => ({ ...r, uri: `spotify:${r.type}:${r.id}` })),
+  { id: ARTIST_ID, uri: `spotify:artist:${ARTIST_ID}`, title: "Top tracks", native: "YOASOBI", date: null, type: "artist" },
+];
 
 const formatDate = (iso) =>
-  new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 
-// A real (per-browser) visit counter in the old hit-counter style.
-function useVisits() {
-  const [n, setN] = useState(null);
+// Spotify's iFrame API: one embedded player we can load and play from our own buttons.
+let apiPromise;
+function loadSpotifyApi() {
+  if (!apiPromise) {
+    apiPromise = new Promise((resolve, reject) => {
+      window.onSpotifyIframeApiReady = resolve;
+      const s = document.createElement("script");
+      s.src = "https://open.spotify.com/embed/iframe-api/v1";
+      s.async = true;
+      s.onerror = () => {
+        apiPromise = null;
+        reject(new Error("Spotify player could not load"));
+      };
+      document.body.appendChild(s);
+    });
+  }
+  return apiPromise;
+}
+
+function useSpotifyPlayer(mountRef) {
+  const controller = useRef(null);
+  const pending = useRef(null); // uri to play as soon as the player is ready
+  const [current, setCurrent] = useState(null);
+  const [paused, setPaused] = useState(true);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
-    try {
-      const next = (Number(localStorage.getItem("ys-visits")) || 0) + 1;
-      localStorage.setItem("ys-visits", String(next));
-      setN(next);
-    } catch {
-      setN(1);
-    }
-  }, []);
-  return n;
+    let alive = true;
+    loadSpotifyApi()
+      .then((IFrameAPI) => {
+        if (!alive || !mountRef.current) return;
+        // Spotify swaps this element for its iframe, so it must not be React's own node.
+        const el = document.createElement("div");
+        mountRef.current.appendChild(el);
+        IFrameAPI.createController(el, { uri: pending.current || BOXES[0].uri, width: "100%", height: 80 }, (c) => {
+          if (!alive) {
+            c.destroy?.();
+            return;
+          }
+          controller.current = c;
+          c.addListener("ready", () => {
+            if (pending.current) {
+              pending.current = null;
+              c.play();
+            }
+          });
+          c.addListener("playback_update", (e) => setPaused(e.data.isPaused));
+        });
+      })
+      .catch((e) => alive && setError(e.message));
+    return () => {
+      alive = false;
+      controller.current?.destroy?.();
+      controller.current = null;
+      if (mountRef.current) mountRef.current.innerHTML = "";
+    };
+  }, [mountRef]);
+
+  const playBox = useCallback(
+    (box) => {
+      const c = controller.current;
+      if (box.uri === current && c) {
+        c.togglePlay();
+        return;
+      }
+      setCurrent(box.uri);
+      setPaused(false);
+      pending.current = box.uri;
+      if (c) c.loadUri(box.uri);
+    },
+    [current],
+  );
+
+  return { current, paused, error, playBox };
+}
+
+function MusicBox({ box, index, playing, selected, onPlay }) {
+  return (
+    <li className="mb-cell" style={{ "--i": index }}>
+      <button
+        type="button"
+        className={`mb${playing ? " is-playing" : ""}${selected ? " is-selected" : ""}`}
+        aria-pressed={playing}
+        aria-label={`${playing ? "Pause" : "Play"} ${box.title}`}
+        onClick={() => onPlay(box)}
+      >
+        <span className="mb-notes" aria-hidden="true">
+          <i>♪</i>
+          <i>♫</i>
+          <i>♪</i>
+        </span>
+        <span className="mb-lid" aria-hidden="true" />
+        <span className="mb-body">
+          <span className="mb-crank" aria-hidden="true" />
+          <span className="mb-plaque">
+            <span className="mb-title">{box.title}</span>
+            <span className="mb-sub">{box.native}</span>
+            {box.date && <span className="mb-date">{formatDate(box.date)}</span>}
+          </span>
+          <span className="mb-state" aria-hidden="true">
+            {playing ? "❚❚ playing" : "▶ play"}
+          </span>
+        </span>
+        {index === 0 && <span className="mb-new">new</span>}
+      </button>
+    </li>
+  );
 }
 
 export default function YoasobiSpace() {
-  const visits = useVisits();
+  const mount = useRef(null);
+  const { current, paused, error, playBox } = useSpotifyPlayer(mount);
+  const now = BOXES.find((b) => b.uri === current);
+
   return (
     <div className="ys">
-      <div className="ys-page">
-        <header className="ys-header">
-          <div className="ys-moon" aria-hidden="true" />
-          <div>
-            <h1>☆ YOASOBI in orbit ☆</h1>
-            <p className="ys-tagline">a cozy little corner of the night sky for the newest songs ~</p>
-          </div>
-        </header>
+      <header className="ys-head">
+        <div className="ys-moon" aria-hidden="true" />
+        <h1>YOASOBI music boxes</h1>
+        <p>Open a box to hear it. Newest first.</p>
+      </header>
 
-        <nav className="ys-nav" aria-label="Releases">
-          {RELEASES.map((r) => (
-            <a key={r.id} href={`#ys-${r.id}`}>
-              {r.title}
-            </a>
-          ))}
-        </nav>
+      <ol className="mb-grid">
+        {BOXES.map((box, i) => (
+          <MusicBox
+            key={box.uri}
+            box={box}
+            index={i}
+            selected={box.uri === current}
+            playing={box.uri === current && !paused}
+            onPlay={playBox}
+          />
+        ))}
+      </ol>
 
-        <div className="ys-layout">
-          <main className="ys-posts">
-            {RELEASES.map((r, i) => (
-              <article key={r.id} id={`ys-${r.id}`} className="ys-post">
-                <div className="ys-date" aria-hidden="true">
-                  <span>{new Date(`${r.date}T00:00:00`).toLocaleDateString(undefined, { month: "short" })}</span>
-                  <b>{Number(r.date.slice(8))}</b>
-                </div>
-                <div className="ys-post-body">
-                  <h2>
-                    {r.title}
-                    {i === 0 && <span className="ys-new">new!</span>}
-                  </h2>
-                  <p className="ys-byline">
-                    {r.native} · posted <time dateTime={r.date}>{formatDate(r.date)}</time>
-                  </p>
-                  <p>{r.note}</p>
-                  <iframe
-                    className={`ys-player is-${r.type}`}
-                    src={embed(r.type, r.id)}
-                    title={`${r.title} on Spotify`}
-                    loading="lazy"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  />
-                  <p className="ys-tags">
-                    filed under: <span>yoasobi</span> <span>{r.type === "album" ? "albums" : "singles"}</span>{" "}
-                    <span>2026</span>
-                  </p>
-                </div>
-              </article>
-            ))}
-          </main>
-
-          <aside className="ys-sidebar">
-            <section className="ys-widget">
-              <h3>♪ about the band</h3>
-              <p>
-                YOASOBI is <b>Ayase</b> (composer) and <b>ikura</b> (vocals), a duo that turns short stories into songs.
-              </p>
-            </section>
-            <section className="ys-widget">
-              <h3>☾ now playing</h3>
-              <iframe
-                className="ys-player is-artist"
-                src={embed("artist", ARTIST_ID)}
-                title="YOASOBI top tracks on Spotify"
-                loading="lazy"
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              />
-            </section>
-            <section className="ys-widget">
-              <h3>✿ archive</h3>
-              <ul>
-                {RELEASES.map((r) => (
-                  <li key={r.id}>
-                    <a href={`#ys-${r.id}`}>{r.title}</a> <small>({r.date.slice(0, 7)})</small>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section className="ys-widget ys-counter">
-              <h3>☆ your visits</h3>
-              <div className="ys-digits" aria-label={`You have visited ${visits ?? 1} times`}>
-                {String(visits ?? 1)
-                  .padStart(6, "0")
-                  .split("")
-                  .map((d, i) => (
-                    <span key={i}>{d}</span>
-                  ))}
-              </div>
-              <p>counted in this browser only ♡</p>
-            </section>
-          </aside>
+      <div className="ys-dock" aria-live="polite">
+        <p className="ys-dock-label">
+          {error ? error : now ? `Now in the box: ${now.title}` : "Pick a music box"}
+        </p>
+        <div className="ys-dock-player">
+          <div ref={mount} />
         </div>
-
-        <footer className="ys-footer">
-          made with ♡ under the stars · players by Spotify (log in to hear full tracks) · best viewed with a warm drink
-        </footer>
       </div>
+      <p className="ys-foot">Players by Spotify. Log in to Spotify in this browser to hear full tracks.</p>
     </div>
   );
 }
