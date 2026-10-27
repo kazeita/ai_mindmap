@@ -87,6 +87,10 @@ Decision record, kill criteria and roadmap: [docs/draft-board.md](docs/draft-boa
 - **Endless Way** (`/endless-way`): the text lives in [`src/stories/endless-way.txt`](src/stories/endless-way.txt), plain text you can edit directly. The first line is the title, paragraphs are separated by a blank line, and a paragraph that is only `〇`, `⁂` or `* * *` becomes a scene break.
 - **The Amber Heart** (`/amber-heart`): a standalone page at [`public/stories/amber-heart.html`](public/stories/amber-heart.html), shown inside the site.
 
+## YOASOBI (fifth tab)
+
+`/yoasobi` is a space-themed page of Spotify players for YOASOBI's latest releases. To add or reorder releases, edit [`src/yoasobi/releases.js`](src/yoasobi/releases.js): paste the ID from a Spotify share link (the part after `/track/` or `/album/`).
+
 ## License
 
 MIT
