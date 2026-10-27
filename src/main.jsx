@@ -6,6 +6,7 @@ import SiteTabs, { TABS, tabForPath } from './SiteTabs.jsx'
 
 const DraftBoard = lazy(() => import('./draft-board/DraftBoard.jsx'))
 const EndlessWay = lazy(() => import('./stories/EndlessWay.jsx'))
+const YoasobiSpace = lazy(() => import('./yoasobi/YoasobiSpace.jsx'))
 
 const path = window.location.pathname
 const isV1 = path === '/v1' || path.startsWith('/v1/')
@@ -66,6 +67,13 @@ function Site() {
       <div className="site-view" hidden={active !== 'amber'}>
         {visited.has('amber') && (
           <iframe className="site-story-frame" src="/stories/amber-heart.html" title="The Amber Heart" />
+        )}
+      </div>
+      <div className="site-view" hidden={active !== 'yoasobi'}>
+        {visited.has('yoasobi') && (
+          <Suspense fallback={<p className="site-loading">Loading…</p>}>
+            <YoasobiSpace />
+          </Suspense>
         )}
       </div>
     </>
