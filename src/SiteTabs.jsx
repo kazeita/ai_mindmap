@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import "./site-tabs.css";
 
 export const TABS = [
@@ -12,9 +13,14 @@ export const tabForPath = (path) =>
   TABS.find((t) => t.path !== "/" && (path === t.path || path.startsWith(`${t.path}/`)))?.id ?? "map";
 
 export default function SiteTabs({ active, onNavigate }) {
+  const inner = useRef(null);
+  // On narrow screens the bar scrolls sideways; keep the current tab in view.
+  useEffect(() => {
+    inner.current?.querySelector(".is-active")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
   return (
     <nav className="site-tabs" aria-label="Site sections">
-      <div className="site-tabs-inner">
+      <div className="site-tabs-inner" ref={inner}>
         {TABS.map((tab) => (
           <a
             key={tab.id}

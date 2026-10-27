@@ -89,7 +89,7 @@ Decision record, kill criteria and roadmap: [docs/draft-board.md](docs/draft-boa
 
 ## YOASOBI (fifth tab)
 
-`/yoasobi` is a space-themed page of Spotify players for YOASOBI's latest releases. To add or reorder releases, edit [`src/yoasobi/releases.js`](src/yoasobi/releases.js): paste the ID from a Spotify share link (the part after `/track/` or `/album/`).
+`/yoasobi` is a cozy, 2010-style night-sky music blog of Spotify players for YOASOBI's latest releases. To add or reorder releases, edit [`src/yoasobi/releases.js`](src/yoasobi/releases.js): paste the ID from a Spotify share link (the part after `/track/` or `/album/`).
 
 ## License
 
