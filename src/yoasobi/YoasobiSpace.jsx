@@ -23,6 +23,7 @@ const ALL_BOXES = SHELVES.flatMap((s) => s.boxes);
 // Repeat cycles like Spotify's own button: off → whole shelf → this box.
 const REPEAT_MODES = ["off", "all", "one"];
 const REPEAT_LABEL = { off: "Repeat off", all: "Repeat shelf", one: "Repeat this box" };
+const REPEAT_SYMBOL = { off: "🔁", all: "🔁", one: "🔂" };
 const REPEAT_KEY = "yoasobi-repeat";
 
 function savedRepeat() {
@@ -56,10 +57,16 @@ function loadSpotifyApi() {
   return apiPromise;
 }
 
-// Spotify reports no "ended" event, so a pause that lands in the last couple of
-// seconds counts as the end. Albums pause briefly between tracks, hence the wait.
+// Spotify reports no "ended" event, so a stop near the end counts as the end:
+// the last couple of seconds of the track, or the 30 s mark when a logged-out
+// visitor only gets the preview (the reported duration is still the full song).
+// Albums pause briefly between tracks, hence the settle wait.
 const END_WINDOW_MS = 2000;
 const END_SETTLE_MS = 1200;
+const PREVIEW_MS = 30000;
+const STALL_MS = 3000; // no updates while "playing" means it quietly stopped
+const nearEnd = ({ position: p, duration: d }) =>
+  (d > 0 && p >= d - END_WINDOW_MS) || Math.abs(p - PREVIEW_MS) <= END_WINDOW_MS;
 
 function useSpotifyPlayer(mountRef, repeat) {
   const controller = useRef(null);
@@ -111,9 +118,10 @@ function useSpotifyPlayer(mountRef, repeat) {
             setPaused(isPaused);
             clearTimeout(endTimer.current);
             const quiet = Math.max(userToggled.current, loadedAt.current);
-            if (!isPaused || Date.now() - quiet < END_WINDOW_MS) return;
-            const nearEnd = (p, d) => d > 0 && p >= d - END_WINDOW_MS;
-            if (nearEnd(position, duration) || nearEnd(prev.position, prev.duration)) {
+            if (Date.now() - quiet < END_WINDOW_MS) return;
+            if (!isPaused) {
+              endTimer.current = setTimeout(() => nearEnd(last.current) && onEnd.current(), STALL_MS);
+            } else if (nearEnd(last.current) || nearEnd(prev)) {
               endTimer.current = setTimeout(() => onEnd.current(), END_SETTLE_MS);
             }
           });
@@ -240,10 +248,10 @@ export default function YoasobiSpace() {
             type="button"
             className={`ys-repeat is-${repeat}`}
             onClick={cycleRepeat}
-            title="Change repeat mode"
+            title={REPEAT_LABEL[repeat]}
             aria-label={`${REPEAT_LABEL[repeat]}. Change repeat mode`}
           >
-            <span aria-hidden="true">{repeat === "one" ? "🔂" : "🔁"}</span> {REPEAT_LABEL[repeat]}
+            <span aria-hidden="true">{REPEAT_SYMBOL[repeat]}</span>
           </button>
         </div>
         <div className="ys-dock-player">
