@@ -89,7 +89,7 @@ Decision record, kill criteria and roadmap: [docs/draft-board.md](docs/draft-boa
 
 ## YOASOBI (fifth tab)
 
-`/yoasobi` is a grid of music boxes, one per YOASOBI release; click one and it plays right away in a shared Spotify player. To add or reorder releases, edit [`src/yoasobi/releases.js`](src/yoasobi/releases.js): paste the ID from a Spotify share link (the part after `/track/` or `/album/`).
+`/yoasobi` is a grid of music boxes: a shelf of favourites, then the latest releases. Click one and it plays right away in a shared Spotify player; the repeat button cycles between off, the whole shelf and the current box. To add or reorder songs (`FAVORITES` or `RELEASES`), edit [`src/yoasobi/releases.js`](src/yoasobi/releases.js): paste the ID from a Spotify share link (the part after `/track/` or `/album/`).
 
 ## License
 
