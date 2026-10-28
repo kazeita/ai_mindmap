@@ -73,22 +73,49 @@ function useSpotifyPlayer(mountRef, repeat) {
   const pending = useRef(null); // uri to play as soon as the player is ready
   const last = useRef({ position: 0, duration: 0 });
   const endTimer = useRef(null);
-  const userToggled = useRef(0); // when someone last paused or resumed by hand
   const loadedAt = useRef(0);
+  const pausedByHand = useRef(false); // a pause from our boxes is never "the end"
+  // Logged-out visitors often get no playback_update events at all, so we also
+  // keep our own clock and treat 30 s of playing as the end of the preview.
+  const heardFromSpotify = useRef(false);
+  const clock = useRef({ playedMs: 0, since: null, timer: null });
   const onEnd = useRef(() => {});
   const [currentKey, setCurrentKey] = useState(null);
   const [paused, setPaused] = useState(true);
   const [error, setError] = useState(null);
 
-  const load = useCallback((box) => {
-    clearTimeout(endTimer.current);
-    last.current = { position: 0, duration: 0 };
-    loadedAt.current = Date.now();
-    setCurrentKey(box.key);
-    setPaused(false);
-    pending.current = box.uri;
-    controller.current?.loadUri(box.uri);
+  const stopClock = useCallback(() => {
+    const k = clock.current;
+    clearTimeout(k.timer);
+    if (k.since !== null) k.playedMs += Date.now() - k.since;
+    k.since = null;
   }, []);
+
+  const startClock = useCallback(() => {
+    const k = clock.current;
+    if (heardFromSpotify.current || k.since !== null) return;
+    k.since = Date.now();
+    k.timer = setTimeout(() => {
+      if (!heardFromSpotify.current) onEnd.current();
+    }, Math.max(0, PREVIEW_MS + END_SETTLE_MS - k.playedMs));
+  }, []);
+
+  const load = useCallback(
+    (box) => {
+      clearTimeout(endTimer.current);
+      stopClock();
+      clock.current.playedMs = 0;
+      heardFromSpotify.current = false;
+      pausedByHand.current = false;
+      last.current = { position: 0, duration: 0 };
+      loadedAt.current = Date.now();
+      setCurrentKey(box.key);
+      setPaused(false);
+      pending.current = box.uri;
+      controller.current?.loadUri(box.uri);
+    },
+    [stopClock],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -109,16 +136,19 @@ function useSpotifyPlayer(mountRef, repeat) {
             if (pending.current) {
               pending.current = null;
               c.play();
+              startClock();
             }
           });
           c.addListener("playback_update", (e) => {
             const { isPaused, position = 0, duration = 0 } = e.data;
+            heardFromSpotify.current = true;
+            stopClock();
             const prev = last.current;
             last.current = { position, duration };
             setPaused(isPaused);
             clearTimeout(endTimer.current);
-            const quiet = Math.max(userToggled.current, loadedAt.current);
-            if (Date.now() - quiet < END_WINDOW_MS) return;
+            if (!isPaused) pausedByHand.current = false;
+            if (pausedByHand.current || Date.now() - loadedAt.current < END_WINDOW_MS) return;
             if (!isPaused) {
               endTimer.current = setTimeout(() => nearEnd(last.current) && onEnd.current(), STALL_MS);
             } else if (nearEnd(last.current) || nearEnd(prev)) {
@@ -131,15 +161,18 @@ function useSpotifyPlayer(mountRef, repeat) {
     return () => {
       alive = false;
       clearTimeout(endTimer.current);
+      clearTimeout(clock.current.timer);
       controller.current?.destroy?.();
       controller.current = null;
       if (mountRef.current) mountRef.current.innerHTML = "";
     };
-  }, [mountRef]);
+  }, [mountRef, startClock, stopClock]);
 
   onEnd.current = () => {
+    stopClock();
     const box = ALL_BOXES.find((b) => b.key === currentKey);
-    if (!box || repeat === "off") return;
+    if (!box) return;
+    if (repeat === "off") return setPaused(true);
     if (repeat === "one") return load(box);
     const boxes = SHELVES.find((s) => s.id === box.shelf).boxes;
     load(boxes[(box.index + 1) % boxes.length]);
@@ -148,14 +181,23 @@ function useSpotifyPlayer(mountRef, repeat) {
   const playBox = useCallback(
     (box) => {
       const c = controller.current;
-      if (box.key === currentKey && c) {
-        userToggled.current = Date.now();
-        c.togglePlay();
-        return;
+      if (box.key !== currentKey || !c) return load(box);
+      // Explicit pause/resume from our own state: togglePlay depends on the
+      // embed knowing its state, which it may not report when logged out.
+      clearTimeout(endTimer.current);
+      if (paused) {
+        pausedByHand.current = false;
+        setPaused(false);
+        c.resume();
+        startClock();
+      } else {
+        pausedByHand.current = true;
+        setPaused(true);
+        c.pause();
+        stopClock();
       }
-      load(box);
     },
-    [currentKey, load],
+    [currentKey, paused, load, startClock, stopClock],
   );
 
   return { currentKey, paused, error, playBox };
