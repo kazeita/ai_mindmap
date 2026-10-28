@@ -115,25 +115,34 @@
 .mb.is-playing .mb-notes i:nth-child(2){animation-delay:.8s}
 .mb.is-playing .mb-notes i:nth-child(3){animation-delay:1.6s}
 
-/* shared player */
+/* shared player: glossy white, so any Spotify cover colour sits well inside it */
 .ys-dock{
   position:sticky;bottom:12px;max-width:640px;margin:48px auto 0;padding:10px 12px 12px;z-index:5;
-  background:linear-gradient(180deg,#8a5a36,#6b4226);border:2px solid #4a2c17;border-radius:14px;
-  box-shadow:0 12px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.18);
+  background:linear-gradient(180deg,#ffffff 0%,#f6f7fb 48%,#e9ebf3 52%,#f4f5fa 100%);
+  border:1px solid #c9ccd8;border-radius:16px;
+  box-shadow:0 14px 32px rgba(10,6,30,.55),0 0 0 1px rgba(255,255,255,.6) inset,0 -2px 0 rgba(0,0,0,.05) inset;
 }
-.ys-dock-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 8px}
-.ys-dock-label{font-family:Georgia,serif;font-style:italic;font-size:14px;color:#ffe9a8;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ys-dock::before{ /* the gloss: a soft highlight over the top half */
+  content:"";position:absolute;left:1px;right:1px;top:1px;height:46%;border-radius:15px 15px 40% 40% / 15px 15px 14px 14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.25));pointer-events:none;
+}
+.ys-dock-top{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 8px}
+.ys-dock-label{font-family:Georgia,serif;font-style:italic;font-size:14px;color:#4b4268;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 0 #fff}
 .ys-repeat{
   flex:none;margin-left:auto;font-size:16px;line-height:1;cursor:pointer;
-  width:34px;height:30px;padding:0;border-radius:12px;border:1px solid #c9a96f;background:linear-gradient(180deg,#fffaf0,#e9d4ab);
-  box-shadow:0 2px 0 #3a2210;
+  width:34px;height:30px;padding:0;border-radius:15px;border:1px solid #c3c7d4;
+  background:linear-gradient(180deg,#fff 0%,#f3f4f8 50%,#e4e6ee 51%,#f1f2f7 100%);
+  box-shadow:0 1px 2px rgba(0,0,0,.15),inset 0 1px 0 #fff;
 }
-.ys-repeat:hover{background:linear-gradient(180deg,#fff,#f3e3c3)}
-.ys-repeat:active{transform:translateY(1px);box-shadow:0 1px 0 #3a2210}
-.ys-repeat:focus-visible{outline:3px solid #ffe9a8;outline-offset:2px}
-.ys-repeat.is-off span{opacity:.45;filter:grayscale(1)}
-.ys-repeat.is-all,.ys-repeat.is-one{border-color:#e6b45a;background:linear-gradient(180deg,#fff4d0,#ffe08a)}
-.ys-dock-player{border-radius:10px;overflow:hidden;background:#2a1a0e;min-height:80px}
+.ys-repeat:hover{border-color:#aeb3c4}
+.ys-repeat:active{transform:translateY(1px);box-shadow:inset 0 1px 3px rgba(0,0,0,.18)}
+.ys-repeat:focus-visible{outline:3px solid #b9a6f5;outline-offset:2px}
+.ys-repeat.is-off span{opacity:.4;filter:grayscale(1)}
+.ys-repeat.is-all,.ys-repeat.is-one{
+  border-color:#a593e6;background:linear-gradient(180deg,#f6f2ff 0%,#e8e0ff 50%,#d9ccff 51%,#ebe4ff 100%);
+  box-shadow:0 0 8px rgba(150,120,240,.45),inset 0 1px 0 #fff;
+}
+.ys-dock-player{position:relative;border-radius:12px;overflow:hidden;background:#eceef4;min-height:80px;box-shadow:0 0 0 1px #d3d6e0,inset 0 1px 3px rgba(0,0,0,.12)}
 .ys-dock-player iframe{display:block}
 .ys-foot{text-align:center;font-size:12px;color:#b5a8d6;margin-top:16px}
 
@@ -142,7 +151,7 @@
 @keyframes mb-note{0%{opacity:0;transform:translateY(0) rotate(0)}20%{opacity:1}100%{opacity:0;transform:translateY(-46px) rotate(18deg)}}
 
 @media (max-width:900px){.mb-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:40px 18px}}
-@media (max-width:420px){.mb-title{font-size:15px}.mb-body{aspect-ratio:auto;min-height:150px}.ys-dock-label{display:none}.ys-dock{padding:8px}.ys-dock-top{margin-bottom:6px}}
+@media (max-width:420px){.mb-title{font-size:15px}.mb-body{aspect-ratio:auto;min-height:150px}.ys-dock-label{font-size:13px}.ys-dock{padding:8px}.ys-dock-top{margin-bottom:6px}}
 @media (prefers-reduced-motion:reduce){
   .mb-cell,.mb.is-playing .mb-crank,.mb.is-playing .mb-notes i{animation:none}
   .mb-lid,.mb-body{transition:none}

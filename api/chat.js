@@ -26,10 +26,53 @@ const MAX_TOKENS_BY_KIND = {
 const TEMPERATURE = 0.8;
 const MAX_USER_MESSAGE_CHARS = 16000;
 
+// Abuse guard. Browsers always send Origin on a JSON POST; scripts usually don't.
+// The per-IP limit lives in this instance's memory, so it is a soft second layer.
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_MAX = 40;
+const hits = new Map();
+
+function fromOurSite(req) {
+ const source = req.headers.origin || req.headers.referer;
+ if (!source) return false;
+ let host;
+ try {
+ host = new URL(source).host;
+ } catch {
+ return false;
+ }
+ const ownHost = req.headers["x-forwarded-host"] || req.headers.host;
+ if (host === ownHost) return true;
+ const local = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host);
+ return local && process.env.VERCEL_ENV !== "production";
+}
+
+function overLimit(req) {
+ const ip = String(req.headers["x-real-ip"] || req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
+ const now = Date.now();
+ const recent = (hits.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
+ recent.push(now);
+ hits.set(ip, recent);
+ if (hits.size > 5000) {
+ for (const [key, times] of hits) if (now - times[times.length - 1] >= RATE_WINDOW_MS) hits.delete(key);
+ }
+ return recent.length > RATE_MAX;
+}
+
 export default async function handler(req, res) {
  if (req.method !== "POST") {
  res.setHeader("Allow", "POST");
  return res.status(405).end();
+ }
+
+ if (!fromOurSite(req)) {
+ console.warn("[blocked]", "origin", req.headers["user-agent"] || "-");
+ return res.status(403).json({ error: { message: "Forbidden" } });
+ }
+ if (overLimit(req)) {
+ console.warn("[blocked]", "rate", req.headers["user-agent"] || "-");
+ res.setHeader("Retry-After", "600");
+ return res.status(429).json({ error: { message: "Too many requests, try again in a few minutes" } });
  }
 
  const { kind, userMessage } = req.body || {};
