@@ -58,25 +58,49 @@ function loadSpotifyApi() {
   return apiPromise;
 }
 
-// Spotify reports no "ended" event, so a stop near the end counts as the end:
-// the last couple of seconds of the track, or the 30 s mark when a logged-out
-// visitor only gets the preview (the reported duration is still the full song).
-// Albums pause briefly between tracks, hence the settle wait.
+// Spotify reports no "ended" event, so the end is inferred. A stop counts as
+// the end when it lands in the last couple of seconds of the track, at the
+// 30 s mark (logged-out visitors only get a preview, while the reported
+// duration is still the full song), or when the position jumps back to the
+// start after a good stretch of playing. Albums pause briefly between tracks,
+// so they get a short settle wait before the end is acted on.
 const END_WINDOW_MS = 2000;
 const END_SETTLE_MS = 1200;
 const PREVIEW_MS = 30000;
-const STALL_MS = 3000; // no updates while "playing" means it quietly stopped
+const STALL_MS = 3000; // near an end and no more updates: it quietly stopped
+const RESET_MIN_MS = 10000;
+const READY_WAIT_MS = 1500; // no "ready" after loadUri: press play anyway
 const nearEnd = ({ position: p, duration: d }) =>
   (d > 0 && p >= d - END_WINDOW_MS) || Math.abs(p - PREVIEW_MS) <= END_WINDOW_MS;
+const newTrack = () => ({ position: 0, duration: 0, maxPosition: 0 });
 
-function useSpotifyPlayer(mountRef, repeat) {
+// /yoasobi?debug shows what the Spotify player reports and what this page does about it.
+const DEBUG = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug");
+const secs = (ms) => (ms / 1000).toFixed(1);
+
+function useDebugLog() {
+  const [lines, setLines] = useState([]);
+  const log = useCallback((text, kind = "") => {
+    if (!DEBUG) return;
+    const line = { text: `${secs(performance.now())}  ${text}`, kind };
+    // A run of position updates collapses into its latest line.
+    setLines((all) => [...(kind && all.at(-1)?.kind === kind ? all.slice(0, -1) : all), line].slice(-18));
+  }, []);
+  return [lines, log];
+}
+
+function useSpotifyPlayer(mountRef, repeat, log) {
   const controller = useRef(null);
   const pending = useRef(null); // uri to play as soon as the player is ready
-  const last = useRef({ position: 0, duration: 0 });
+  const current = useRef(null); // the box that is loaded
+  const track = useRef(newTrack());
   const endTimer = useRef(null);
+  const endPending = useRef(false);
+  const readyTimer = useRef(null);
   const loadedAt = useRef(0);
   const pausedByHand = useRef(false); // a pause from our boxes is never "the end"
-  // Logged-out visitors often get no playback_update events at all, so we also
+  const finished = useRef(false); // ended with repeat off: the next tap starts it again
+  // Logged-out visitors may get no playback_update events at all, so we also
   // keep our own clock and treat 30 s of playing as the end of the preview.
   const heardFromSpotify = useRef(false);
   const clock = useRef({ playedMs: 0, since: null, timer: null });
@@ -97,25 +121,65 @@ function useSpotifyPlayer(mountRef, repeat) {
     if (heardFromSpotify.current || k.since !== null) return;
     k.since = Date.now();
     k.timer = setTimeout(() => {
-      if (!heardFromSpotify.current) onEnd.current();
+      if (heardFromSpotify.current) return;
+      log("end: 30 s played with no word from Spotify");
+      onEnd.current();
     }, Math.max(0, PREVIEW_MS + END_SETTLE_MS - k.playedMs));
+  }, [log]);
+
+  const cancelEnd = useCallback(() => {
+    clearTimeout(endTimer.current);
+    endPending.current = false;
   }, []);
+
+  // The end was spotted. Tracks act on it at once (a hidden tab may not get
+  // another timer for a while); albums wait in case the next track starts.
+  const finish = useCallback(
+    (reason) => {
+      clearTimeout(endTimer.current);
+      endPending.current = true;
+      const wait = current.current?.type === "track" ? 0 : END_SETTLE_MS;
+      log(`end: ${reason}`);
+      if (wait) endTimer.current = setTimeout(() => onEnd.current(), wait);
+      else onEnd.current();
+    },
+    [log],
+  );
 
   const load = useCallback(
     (box) => {
-      clearTimeout(endTimer.current);
+      const c = controller.current;
+      const again = current.current?.uri === box.uri;
+      cancelEnd();
+      clearTimeout(readyTimer.current);
       stopClock();
       clock.current.playedMs = 0;
       heardFromSpotify.current = false;
       pausedByHand.current = false;
-      last.current = { position: 0, duration: 0 };
+      finished.current = false;
+      track.current = newTrack();
       loadedAt.current = Date.now();
+      current.current = box;
       setCurrentKey(box.key);
       setPaused(false);
       pending.current = box.uri;
-      controller.current?.loadUri(box.uri);
+      if (!c) return;
+      log(`loadUri ${box.title}${again ? " (same song again)" : ""}`);
+      c.loadUri(box.uri);
+      if (again) {
+        // Loading the song that is already loaded may do nothing, so no "ready" follows.
+        c.play();
+        startClock();
+        return;
+      }
+      readyTimer.current = setTimeout(() => {
+        if (pending.current !== box.uri) return;
+        log("no ready after loadUri: play anyway");
+        c.play();
+        startClock();
+      }, READY_WAIT_MS);
     },
-    [stopClock],
+    [cancelEnd, stopClock, startClock, log],
   );
 
   useEffect(() => {
@@ -134,6 +198,8 @@ function useSpotifyPlayer(mountRef, repeat) {
           }
           controller.current = c;
           c.addListener("ready", () => {
+            log(`ready${pending.current ? ": play" : ""}`);
+            clearTimeout(readyTimer.current);
             if (pending.current) {
               pending.current = null;
               c.play();
@@ -141,39 +207,67 @@ function useSpotifyPlayer(mountRef, repeat) {
             }
           });
           c.addListener("playback_update", (e) => {
-            const { isPaused, position = 0, duration = 0 } = e.data;
+            const { isPaused, position = 0, duration = 0 } = e.data || {};
+            log(`update ${isPaused ? "paused" : "playing"} pos=${secs(position)} dur=${secs(duration)}`, isPaused ? "" : "tick");
             heardFromSpotify.current = true;
             stopClock();
-            const prev = last.current;
-            last.current = { position, duration };
             setPaused(isPaused);
-            clearTimeout(endTimer.current);
-            if (!isPaused) pausedByHand.current = false;
-            if (pausedByHand.current || Date.now() - loadedAt.current < END_WINDOW_MS) return;
+            const settled = Date.now() - loadedAt.current >= END_WINDOW_MS; // earlier updates may be the old song's
+            const prev = track.current;
+            const now = { position, duration, maxPosition: prev.maxPosition };
+            if (!isPaused && settled) now.maxPosition = Math.max(prev.maxPosition, position);
+            track.current = now;
+
             if (!isPaused) {
-              endTimer.current = setTimeout(() => nearEnd(last.current) && onEnd.current(), STALL_MS);
-            } else if (nearEnd(last.current) || nearEnd(prev)) {
-              endTimer.current = setTimeout(() => onEnd.current(), END_SETTLE_MS);
+              pausedByHand.current = false;
+              finished.current = false;
+              cancelEnd();
+              // If the updates simply stop, these are the moments the song would have run out.
+              const waits = [];
+              if (duration > 0) waits.push(duration - position + STALL_MS / 2);
+              if (nearEnd(now)) waits.push(STALL_MS);
+              if (settled && waits.length) {
+                endTimer.current = setTimeout(() => finish("updates stopped at an end"), Math.max(0, Math.min(...waits)));
+              }
+              return;
             }
+            // Paused. Once the end is spotted, later paused updates must not cancel it.
+            if (endPending.current) return;
+            clearTimeout(endTimer.current);
+            if (pausedByHand.current || !settled) return;
+            if (nearEnd(now) || nearEnd(prev)) finish("stopped at an end");
+            else if (position <= 1000 && prev.maxPosition >= RESET_MIN_MS) finish("jumped back to the start");
           });
+          if (DEBUG) {
+            ["playback_started", "error"].forEach((name) =>
+              c.addListener(name, (e) => log(`${name} ${JSON.stringify(e?.data ?? {})}`)),
+            );
+          }
         });
       })
       .catch((e) => alive && setError(e.message));
     return () => {
       alive = false;
       clearTimeout(endTimer.current);
+      clearTimeout(readyTimer.current);
       clearTimeout(clock.current.timer);
       controller.current?.destroy?.();
       controller.current = null;
       if (mountRef.current) mountRef.current.innerHTML = "";
     };
-  }, [mountRef, startClock, stopClock]);
+  }, [mountRef, startClock, stopClock, cancelEnd, finish, log]);
 
   onEnd.current = () => {
+    cancelEnd();
     stopClock();
-    const box = ALL_BOXES.find((b) => b.key === currentKey);
+    const box = current.current;
     if (!box) return;
-    if (repeat === "off") return setPaused(true);
+    if (repeat === "off") {
+      log("repeat is off: stop here");
+      finished.current = true;
+      setPaused(true);
+      return;
+    }
     if (repeat === "one") return load(box);
     const boxes = SHELVES.find((s) => s.id === box.shelf).boxes;
     load(boxes[(box.index + 1) % boxes.length]);
@@ -182,34 +276,36 @@ function useSpotifyPlayer(mountRef, repeat) {
   const playBox = useCallback(
     (box) => {
       const c = controller.current;
-      if (box.key !== currentKey || !c) return load(box);
+      if (box.key !== currentKey || !c || finished.current) return load(box);
       // Explicit pause/resume from our own state: togglePlay depends on the
       // embed knowing its state, which it may not report when logged out.
-      clearTimeout(endTimer.current);
+      cancelEnd();
       if (paused) {
+        log("box tapped: resume");
         pausedByHand.current = false;
         setPaused(false);
         c.resume();
         startClock();
       } else {
+        log("box tapped: pause");
         pausedByHand.current = true;
         setPaused(true);
         c.pause();
         stopClock();
       }
     },
-    [currentKey, paused, load, startClock, stopClock],
+    [currentKey, paused, load, cancelEnd, startClock, stopClock, log],
   );
 
   // Previous / next box on the same shelf, wrapping round.
   const step = useCallback(
     (dir) => {
-      const box = ALL_BOXES.find((b) => b.key === currentKey);
+      const box = current.current;
       if (!box) return load(ALL_BOXES[0]);
       const boxes = SHELVES.find((s) => s.id === box.shelf).boxes;
       load(boxes[(box.index + dir + boxes.length) % boxes.length]);
     },
-    [currentKey, load],
+    [load],
   );
 
   return { currentKey, paused, error, playBox, step };
@@ -296,7 +392,8 @@ export default function YoasobiSpace() {
   const panel = useRef(null);
   const [repeat, setRepeat] = useState(savedRepeat);
   const [panelInView, setPanelInView] = useState(true);
-  const { currentKey, paused, error, playBox, step } = useSpotifyPlayer(mount, repeat);
+  const [debugLines, log] = useDebugLog();
+  const { currentKey, paused, error, playBox, step } = useSpotifyPlayer(mount, repeat, log);
   const now = ALL_BOXES.find((b) => b.key === currentKey);
   const playing = Boolean(now) && !paused;
 
@@ -392,6 +489,12 @@ export default function YoasobiSpace() {
           </div>
         </div>
       </div>
+
+      {DEBUG && (
+        <pre className="ys-debug" aria-label="Player debug log">
+          {`repeat: ${repeat}\n${debugLines.map((l) => l.text).join("\n")}`}
+        </pre>
+      )}
 
       {now && !panelInView && (
         <div className="ys-mini" style={{ "--hue": now.hue }}>

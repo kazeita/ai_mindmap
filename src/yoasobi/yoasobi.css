@@ -244,6 +244,12 @@
 .ys-mini-title small{font-size:11px;color:#8d85b3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ys-mini-title:focus-visible{outline:3px solid #a78bfa;outline-offset:2px;border-radius:8px}
 
+/* /yoasobi?debug: what the Spotify player reports */
+.ys-debug{
+  position:fixed;z-index:29;left:8px;bottom:78px;max-width:calc(100% - 16px);max-height:46vh;overflow:auto;padding:8px 10px;border-radius:8px;
+  font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;color:#d8ffd8;background:rgba(8,6,24,.88);white-space:pre-wrap;user-select:text;
+}
+
 @keyframes mb-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes mb-spin{to{transform:rotate(360deg)}}
 @keyframes mb-note{0%{opacity:0;transform:translateY(0) rotate(0)}20%{opacity:1}100%{opacity:0;transform:translateY(-46px) rotate(18deg)}}

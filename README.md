@@ -89,7 +89,7 @@ Decision record, kill criteria and roadmap: [docs/draft-board.md](docs/draft-boa
 
 ## YOASOBI (fifth tab)
 
-`/yoasobi` is a grid of music boxes: a shelf of favourites, then the latest releases. Click one and it plays right away in Spotify's large (352px) player, which stays beside the grid on wide screens and sits above it on phones, where a small bar takes over once the player scrolls away. The player has previous, next and repeat buttons; repeat cycles between off, the whole shelf and the current box. To add or reorder songs (`FAVORITES` or `RELEASES`), edit [`src/yoasobi/releases.js`](src/yoasobi/releases.js): paste the ID from a Spotify share link (the part after `/track/` or `/album/`) and pick a `hue` (0–360) for the box colour.
+`/yoasobi` is a grid of music boxes: a shelf of favourites, then the latest releases. Click one and it plays right away in Spotify's large (352px) player, which stays beside the grid on wide screens and sits above it on phones, where a small bar takes over once the player scrolls away. The player has previous, next and repeat buttons; repeat cycles between off, the whole shelf and the current box. To add or reorder songs (`FAVORITES` or `RELEASES`), edit [`src/yoasobi/releases.js`](src/yoasobi/releases.js): paste the ID from a Spotify share link (the part after `/track/` or `/album/`) and pick a `hue` (0–360) for the box colour. If playback misbehaves, open `/yoasobi?debug`: a small log shows what the Spotify player reports and what the page does in response.
 
 ## License
 
