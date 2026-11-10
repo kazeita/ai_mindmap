@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ARTIST_ID, FAVORITES, RELEASES } from "./releases.js";
+import "@fontsource-variable/fraunces/soft.css";
 import "./yoasobi.css";
 
 const shelf = (id, title, items) => ({
@@ -15,7 +16,7 @@ const SHELVES = [
   shelf("fav", "My favourites", FAVORITES),
   shelf("latest", "Latest releases", [
     ...RELEASES,
-    { id: ARTIST_ID, title: "Top tracks", native: "YOASOBI", date: null, type: "artist" },
+    { id: ARTIST_ID, title: "Top tracks", native: "YOASOBI", date: null, type: "artist", hue: 265 },
   ]),
 ];
 const ALL_BOXES = SHELVES.flatMap((s) => s.boxes);
@@ -23,7 +24,7 @@ const ALL_BOXES = SHELVES.flatMap((s) => s.boxes);
 // Repeat cycles like Spotify's own button: off → whole shelf → this box.
 const REPEAT_MODES = ["off", "all", "one"];
 const REPEAT_LABEL = { off: "Repeat off", all: "Repeat shelf", one: "Repeat this box" };
-const REPEAT_SYMBOL = { off: "🔁", all: "🔁", one: "🔂" };
+const PLAYER_HEIGHT = 352; // Spotify's large embed
 const REPEAT_KEY = "yoasobi-repeat";
 
 function savedRepeat() {
@@ -126,7 +127,7 @@ function useSpotifyPlayer(mountRef, repeat) {
         const el = document.createElement("div");
         mountRef.current.appendChild(el);
         const uri = pending.current || ALL_BOXES[0].uri;
-        IFrameAPI.createController(el, { uri, width: "100%", height: 80 }, (c) => {
+        IFrameAPI.createController(el, { uri, width: "100%", height: PLAYER_HEIGHT }, (c) => {
           if (!alive) {
             c.destroy?.();
             return;
@@ -200,7 +201,60 @@ function useSpotifyPlayer(mountRef, repeat) {
     [currentKey, paused, load, startClock, stopClock],
   );
 
-  return { currentKey, paused, error, playBox };
+  // Previous / next box on the same shelf, wrapping round.
+  const step = useCallback(
+    (dir) => {
+      const box = ALL_BOXES.find((b) => b.key === currentKey);
+      if (!box) return load(ALL_BOXES[0]);
+      const boxes = SHELVES.find((s) => s.id === box.shelf).boxes;
+      load(boxes[(box.index + dir + boxes.length) % boxes.length]);
+    },
+    [currentKey, load],
+  );
+
+  return { currentKey, paused, error, playBox, step };
+}
+
+const ICONS = {
+  play: <path d="M8 5.6v12.8a1 1 0 0 0 1.52.85l10.4-6.4a1 1 0 0 0 0-1.7L9.52 4.75A1 1 0 0 0 8 5.6z" />,
+  pause: (
+    <>
+      <rect x="6" y="5" width="4.5" height="14" rx="1.3" />
+      <rect x="13.5" y="5" width="4.5" height="14" rx="1.3" />
+    </>
+  ),
+  next: <path d="M5 6.1v11.8a1 1 0 0 0 1.56.83L15 13.1V18a1.25 1.25 0 0 0 2.5 0V6A1.25 1.25 0 0 0 15 6v4.9L6.56 5.27A1 1 0 0 0 5 6.1z" />,
+  repeat: (
+    <g fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 2.5l3.5 3.5L17 9.5" />
+      <path d="M3.5 11.5V10a4 4 0 0 1 4-4h13" />
+      <path d="M7 21.5L3.5 18 7 14.5" />
+      <path d="M20.5 12.5V14a4 4 0 0 1-4 4h-13" />
+    </g>
+  ),
+};
+
+function Icon({ name, flip }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" style={flip ? { transform: "scaleX(-1)" } : undefined}>
+      {ICONS[name]}
+    </svg>
+  );
+}
+
+function RepeatButton({ repeat, onClick }) {
+  return (
+    <button
+      type="button"
+      className={`ys-btn ys-repeat is-${repeat}`}
+      onClick={onClick}
+      title={REPEAT_LABEL[repeat]}
+      aria-label={`${REPEAT_LABEL[repeat]}. Change repeat mode`}
+    >
+      <Icon name="repeat" />
+      {repeat === "one" && <span className="ys-repeat-one">1</span>}
+    </button>
+  );
 }
 
 function MusicBox({ box, index, playing, selected, isNew, onPlay }) {
@@ -209,6 +263,7 @@ function MusicBox({ box, index, playing, selected, isNew, onPlay }) {
       <button
         type="button"
         className={`mb${playing ? " is-playing" : ""}${selected ? " is-selected" : ""}`}
+        style={{ "--hue": box.hue }}
         aria-pressed={playing}
         aria-label={`${playing ? "Pause" : "Play"} ${box.title}`}
         onClick={() => onPlay(box)}
@@ -220,14 +275,14 @@ function MusicBox({ box, index, playing, selected, isNew, onPlay }) {
         </span>
         <span className="mb-lid" aria-hidden="true" />
         <span className="mb-body">
+          <span className="mb-glow" aria-hidden="true" />
           <span className="mb-crank" aria-hidden="true" />
-          <span className="mb-plaque">
-            <span className="mb-title">{box.title}</span>
-            <span className="mb-sub">{box.native}</span>
-            {box.date && <span className="mb-date">{formatDate(box.date)}</span>}
-          </span>
-          <span className="mb-state" aria-hidden="true">
-            {playing ? "❚❚ playing" : "▶ play"}
+          <span className="mb-title">{box.title}</span>
+          {box.native !== box.title && <span className="mb-sub">{box.native}</span>}
+          {box.date && <span className="mb-date">{formatDate(box.date)}</span>}
+          <span className="mb-disc" aria-hidden="true" />
+          <span className="mb-key" aria-hidden="true">
+            <Icon name={playing ? "pause" : "play"} />
           </span>
         </span>
         {isNew && <span className="mb-new">new</span>}
@@ -238,9 +293,20 @@ function MusicBox({ box, index, playing, selected, isNew, onPlay }) {
 
 export default function YoasobiSpace() {
   const mount = useRef(null);
+  const panel = useRef(null);
   const [repeat, setRepeat] = useState(savedRepeat);
-  const { currentKey, paused, error, playBox } = useSpotifyPlayer(mount, repeat);
+  const [panelInView, setPanelInView] = useState(true);
+  const { currentKey, paused, error, playBox, step } = useSpotifyPlayer(mount, repeat);
   const now = ALL_BOXES.find((b) => b.key === currentKey);
+  const playing = Boolean(now) && !paused;
+
+  // On narrow screens the player scrolls away, so a small bar takes over.
+  useEffect(() => {
+    if (!panel.current || !("IntersectionObserver" in window)) return undefined;
+    const seen = new IntersectionObserver(([entry]) => setPanelInView(entry.isIntersecting), { threshold: 0.2 });
+    seen.observe(panel.current);
+    return () => seen.disconnect();
+  }, []);
 
   const cycleRepeat = () => {
     const next = REPEAT_MODES[(REPEAT_MODES.indexOf(repeat) + 1) % REPEAT_MODES.length];
@@ -252,58 +318,101 @@ export default function YoasobiSpace() {
     }
   };
 
+  const showPlayer = () => {
+    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    panel.current?.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "center" });
+  };
+
   return (
     <div className="ys">
-      <header className="ys-head">
-        <div className="ys-moon" aria-hidden="true" />
-        <h1>YOASOBI music boxes</h1>
-        <p>Open a box to hear it.</p>
-      </header>
+      <div className="ys-wrap">
+        <header className="ys-head">
+          <div className="ys-moon" aria-hidden="true" />
+          <div>
+            <h1>YOASOBI music boxes</h1>
+            <p>Open a box to hear it.</p>
+          </div>
+        </header>
 
-      {SHELVES.map((s) => (
-        <section className="ys-shelf" key={s.id} aria-labelledby={`ys-${s.id}`}>
-          <h2 id={`ys-${s.id}`} className="ys-shelf-title">
-            {s.title}
-          </h2>
-          <ol className="mb-grid">
-            {s.boxes.map((box, i) => (
-              <MusicBox
-                key={box.key}
-                box={box}
-                index={i}
-                isNew={s.id === "latest" && i === 0}
-                selected={box.key === currentKey}
-                playing={box.key === currentKey && !paused}
-                onPlay={playBox}
-              />
+        <div className="ys-main">
+          <aside className="ys-side" aria-label="Player">
+            <div className="ys-player" ref={panel}>
+              <div className="ys-now" aria-live="polite">
+                <span className={`ys-eq${playing ? " is-on" : ""}`} aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <div className="ys-now-text">
+                  <span className="ys-now-label">{error ? "Player" : playing ? "Now playing" : now ? "Paused" : "Ready"}</span>
+                  <span className="ys-now-title">{error ? error : now ? now.title : "Pick a music box"}</span>
+                </div>
+              </div>
+              <div className="ys-embed">
+                <div ref={mount} />
+              </div>
+              <div className="ys-controls">
+                <button type="button" className="ys-btn" onClick={() => step(-1)} aria-label="Previous box" title="Previous box">
+                  <Icon name="next" flip />
+                </button>
+                <button type="button" className="ys-btn" onClick={() => step(1)} aria-label="Next box" title="Next box">
+                  <Icon name="next" />
+                </button>
+                <span className="ys-controls-gap" />
+                <RepeatButton repeat={repeat} onClick={cycleRepeat} />
+              </div>
+            </div>
+            <p className="ys-foot">Log in to Spotify in this browser for full tracks. Volume follows your device.</p>
+          </aside>
+
+          <div className="ys-shelves">
+            {SHELVES.map((s) => (
+              <section className={`ys-shelf is-${s.id}`} key={s.id} aria-labelledby={`ys-${s.id}`}>
+                <div className="ys-shelf-head">
+                  <h2 id={`ys-${s.id}`} className="ys-shelf-title">
+                    {s.title}
+                  </h2>
+                  <span className="ys-shelf-count">{s.boxes.length}</span>
+                </div>
+                <ol className="mb-grid">
+                  {s.boxes.map((box, i) => (
+                    <MusicBox
+                      key={box.key}
+                      box={box}
+                      index={i}
+                      isNew={s.id === "latest" && i === 0}
+                      selected={box.key === currentKey}
+                      playing={box.key === currentKey && !paused}
+                      onPlay={playBox}
+                    />
+                  ))}
+                </ol>
+              </section>
             ))}
-          </ol>
-        </section>
-      ))}
-
-      <div className="ys-dock">
-        <div className="ys-dock-top">
-          <p className="ys-dock-label" aria-live="polite">
-            {error ? error : now ? `Now in the box: ${now.title}` : "Pick a music box"}
-          </p>
-          <button
-            type="button"
-            className={`ys-repeat is-${repeat}`}
-            onClick={cycleRepeat}
-            title={REPEAT_LABEL[repeat]}
-            aria-label={`${REPEAT_LABEL[repeat]}. Change repeat mode`}
-          >
-            <span aria-hidden="true">{REPEAT_SYMBOL[repeat]}</span>
-          </button>
-        </div>
-        <div className="ys-dock-player">
-          <div ref={mount} />
+          </div>
         </div>
       </div>
-      <p className="ys-foot">
-        Players by Spotify. Log in to Spotify in this browser to hear full tracks. Volume follows your device and the
-        Spotify app.
-      </p>
+
+      {now && !panelInView && (
+        <div className="ys-mini" style={{ "--hue": now.hue }}>
+          <button
+            type="button"
+            className="ys-btn is-primary"
+            onClick={() => playBox(now)}
+            aria-label={`${playing ? "Pause" : "Play"} ${now.title}`}
+          >
+            <Icon name={playing ? "pause" : "play"} />
+          </button>
+          <button type="button" className="ys-mini-title" onClick={showPlayer} title="Show the player">
+            <span>{now.title}</span>
+            {now.native !== now.title && <small>{now.native}</small>}
+          </button>
+          <button type="button" className="ys-btn" onClick={() => step(1)} aria-label="Next box" title="Next box">
+            <Icon name="next" />
+          </button>
+          <RepeatButton repeat={repeat} onClick={cycleRepeat} />
+        </div>
+      )}
     </div>
   );
 }
