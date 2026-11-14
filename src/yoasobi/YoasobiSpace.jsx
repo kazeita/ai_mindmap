@@ -36,6 +36,19 @@ function savedRepeat() {
   }
 }
 
+// The player has two skins: the white default and a chrome one. The choice is kept per browser.
+const SKINS = ["default", "chrome"];
+const SKIN_KEY = "yoasobi-skin";
+
+function savedSkin() {
+  try {
+    const v = localStorage.getItem(SKIN_KEY);
+    return SKINS.includes(v) ? v : "default";
+  } catch {
+    return "default";
+  }
+}
+
 const formatDate = (iso) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 
@@ -391,6 +404,7 @@ export default function YoasobiSpace() {
   const mount = useRef(null);
   const panel = useRef(null);
   const [repeat, setRepeat] = useState(savedRepeat);
+  const [skin, setSkin] = useState(savedSkin);
   const [panelInView, setPanelInView] = useState(true);
   const [debugLines, log] = useDebugLog();
   const { currentKey, paused, error, playBox, step } = useSpotifyPlayer(mount, repeat, log);
@@ -415,13 +429,23 @@ export default function YoasobiSpace() {
     }
   };
 
+  const toggleSkin = () => {
+    const next = skin === "chrome" ? "default" : "chrome";
+    setSkin(next);
+    try {
+      localStorage.setItem(SKIN_KEY, next);
+    } catch {
+      // private mode: the choice just lasts for this visit
+    }
+  };
+
   const showPlayer = () => {
     const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     panel.current?.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "center" });
   };
 
   return (
-    <div className="ys">
+    <div className={`ys skin-${skin}`}>
       <div className="ys-wrap">
         <header className="ys-head">
           <div className="ys-moon" aria-hidden="true" />
@@ -434,16 +458,29 @@ export default function YoasobiSpace() {
         <div className="ys-main">
           <aside className="ys-side" aria-label="Player">
             <div className="ys-player" ref={panel}>
-              <div className="ys-now" aria-live="polite">
-                <span className={`ys-eq${playing ? " is-on" : ""}`} aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <div className="ys-now-text">
-                  <span className="ys-now-label">{error ? "Player" : playing ? "Now playing" : now ? "Paused" : "Ready"}</span>
-                  <span className="ys-now-title">{error ? error : now ? now.title : "Pick a music box"}</span>
+              <span className="ys-deco ys-antenna" aria-hidden="true" />
+              <span className="ys-deco ys-neon is-left" aria-hidden="true" />
+              <span className="ys-deco ys-neon is-right" aria-hidden="true" />
+              <div className="ys-top">
+                <div className="ys-now" aria-live="polite">
+                  <span className={`ys-eq${playing ? " is-on" : ""}`} aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <div className="ys-now-text">
+                    <span className="ys-now-label">{error ? "Player" : playing ? "Now playing" : now ? "Paused" : "Ready"}</span>
+                    <span className="ys-now-title">{error ? error : now ? now.title : "Pick a music box"}</span>
+                  </div>
                 </div>
+                  <button
+                  type="button"
+                  className="ys-skin"
+                  onClick={toggleSkin}
+                  aria-pressed={skin === "chrome"}
+                  aria-label="Chrome skin"
+                  title={skin === "chrome" ? "Switch to the default skin" : "Switch to the chrome skin"}
+                />
               </div>
               <div className="ys-embed">
                 <div ref={mount} />

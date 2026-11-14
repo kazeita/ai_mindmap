@@ -36,7 +36,7 @@
 /* layout: shelves on the left, the player stays in view on the right */
 .ys-main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:48px;align-items:start}
 .ys-shelves{grid-column:1;grid-row:1;min-width:0}
-.ys-side{grid-column:2;grid-row:1;position:sticky;top:73px}
+.ys-side{grid-column:2;grid-row:1;position:sticky;top:73px;isolation:isolate}
 
 /* shelves */
 .ys-shelf + .ys-shelf{margin-top:58px}
@@ -177,7 +177,21 @@
   content:"";position:absolute;left:1px;right:1px;top:1px;height:84px;border-radius:23px 23px 60% 60% / 23px 23px 22px 22px;
   background:linear-gradient(180deg,rgba(255,255,255,1),rgba(255,255,255,0));pointer-events:none;
 }
-.ys-now{position:relative;display:flex;align-items:center;gap:12px;padding:6px 8px 14px;min-height:60px}
+.ys-top{position:relative;display:flex;align-items:flex-start;gap:8px}
+.ys-now{position:relative;flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:6px 8px 14px;min-height:60px}
+.ys-deco{display:none}
+/* skin switch: a small orb that looks like the skin it switches to */
+.ys-skin{
+  flex:none;width:24px;height:24px;margin:6px 4px 0 0;padding:0;border-radius:50%;cursor:pointer;border:1px solid #5d6672;
+  background:
+    radial-gradient(circle at 50% 50%,#05080d 0 28%,#39b3ff 30% 40%,rgba(57,179,255,0) 42%),
+    linear-gradient(135deg,#f6f8fb 0%,#aab2bd 45%,#eef1f5 60%,#7f8894 100%);
+  box-shadow:0 1px 3px rgba(20,10,60,.35),0 0 8px rgba(57,179,255,.55),inset 0 1px 0 rgba(255,255,255,.9);
+  transition:transform .15s ease,box-shadow .15s ease;
+}
+.ys-skin:hover{transform:scale(1.12)}
+.ys-skin:active{transform:scale(.96)}
+.ys-skin:focus-visible{outline:3px solid #a78bfa;outline-offset:3px}
 .ys-now-text{display:flex;flex-direction:column;min-width:0}
 .ys-now-label{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8d85b3}
 .ys-now-title{
@@ -244,6 +258,110 @@
 .ys-mini-title small{font-size:11px;color:#8d85b3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ys-mini-title:focus-visible{outline:3px solid #a78bfa;outline-offset:2px;border-radius:8px}
 
+/* ---- chrome skin: brushed silver, black glass and blue light. Switched on by the orb at the top of the player. ---- */
+.skin-chrome{--neon:#39b3ff;--neon-soft:rgba(57,179,255,.55);--glass:#05080d;--steel:#7d8794}
+.skin-chrome .ys-deco{display:block;position:absolute;pointer-events:none}
+.skin-chrome .ys-player{
+  padding:18px 20px 16px;border-radius:44px 44px 30px 30px / 52px 52px 30px 30px;color:#cfeaff;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,0) 15%),
+    linear-gradient(104deg,#f5f7fa 0%,#c5cbd4 20%,#f1f3f7 37%,#a4acb8 58%,#e3e7ec 77%,#8a93a0 100%);
+  box-shadow:
+    0 34px 60px -18px rgba(0,0,0,.95),
+    0 0 0 1px #4d5662,
+    0 0 50px rgba(40,160,255,.38),
+    inset 0 2px 0 #fff,
+    inset 0 -8px 14px rgba(30,40,60,.5);
+}
+.skin-chrome .ys-player::before{ /* a blue light line that follows the top curve */
+  left:9px;right:9px;top:7px;height:60px;border-radius:38px 38px 0 0 / 46px 46px 0 0;background:none;
+  border-top:4px solid var(--neon);filter:drop-shadow(0 0 5px var(--neon));
+  -webkit-mask:linear-gradient(90deg,#000 0 30%,transparent 36% 64%,#000 70%);mask:linear-gradient(90deg,#000 0 30%,transparent 36% 64%,#000 70%);
+}
+.skin-chrome .ys-player::after{ /* a second plate behind the body, showing as a pod on each side */
+  content:"";position:absolute;z-index:-1;left:-14px;right:-14px;top:112px;bottom:74px;border-radius:24px;pointer-events:none;
+  background:linear-gradient(104deg,#e6e9ee 0%,#8a93a0 12%,#eef1f5 50%,#7f8894 88%,#cdd2da 100%);
+  box-shadow:0 0 0 1px #4d5662,inset 0 2px 0 rgba(255,255,255,.85),inset 0 -6px 10px rgba(30,40,60,.45),0 18px 30px -12px rgba(0,0,0,.8),0 0 26px rgba(40,160,255,.3);
+}
+.skin-chrome .ys-antenna{
+  right:46px;top:-64px;width:7px;height:84px;z-index:-1;border-radius:4px 4px 0 0;transform:rotate(7deg);transform-origin:50% 100%;
+  background:linear-gradient(90deg,#3a424d 0%,#e9edf2 35%,#8a93a0 60%,#2a313a 100%);box-shadow:0 0 0 1px #2a313a;
+}
+.skin-chrome .ys-antenna::after{ /* the lit tip */
+  content:"";position:absolute;left:-1px;top:-5px;width:9px;height:9px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#e8f7ff,var(--neon) 60%);box-shadow:0 0 12px 3px var(--neon-soft);
+}
+.skin-chrome .ys-neon{
+  top:132px;bottom:94px;width:5px;border-radius:3px;
+  background:linear-gradient(180deg,var(--neon) 0 34%,transparent 34% 40%,var(--neon) 40% 60%,transparent 60% 66%,var(--neon) 66%);
+  box-shadow:0 0 10px var(--neon-soft);
+}
+.skin-chrome .ys-neon.is-left{left:-9px}
+.skin-chrome .ys-neon.is-right{right:-9px}
+
+/* the top row becomes a black glass readout */
+.skin-chrome .ys-top{align-items:center;gap:10px;margin-bottom:12px}
+.skin-chrome .ys-now{
+  min-height:54px;padding:8px 14px;border-radius:18px 18px 8px 8px;background:var(--glass);
+  box-shadow:0 0 0 1px #1c2836,0 0 0 2px var(--steel),inset 0 0 22px rgba(40,160,255,.3),inset 0 1px 0 rgba(120,200,255,.25);
+}
+.skin-chrome .ys-now-label{color:var(--neon);letter-spacing:.2em}
+.skin-chrome .ys-now-title{
+  font-family:"Eurostile","Bank Gothic","Segoe UI",Roboto,system-ui,sans-serif;font-variation-settings:normal;font-weight:600;
+  font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:#e2f4ff;text-shadow:0 0 10px var(--neon-soft);
+}
+.skin-chrome .ys-eq i{background:#16324a}
+.skin-chrome .ys-eq.is-on i{background:linear-gradient(180deg,#bfe8ff,var(--neon));box-shadow:0 0 6px var(--neon-soft)}
+.skin-chrome .ys-skin{ /* now it shows the white skin it switches back to */
+  margin:0;border-color:#cfd2e0;
+  background:radial-gradient(circle at 35% 30%,#ffffff 0%,#f1f2f8 55%,#d9dcea 100%);
+  box-shadow:0 0 0 2px var(--glass),0 0 0 3px var(--steel),0 0 10px var(--neon-soft);
+}
+.skin-chrome .ys-skin:focus-visible,
+.skin-chrome .ys-btn:focus-visible,
+.skin-chrome .ys-mini-title:focus-visible{outline-color:var(--neon)}
+
+.skin-chrome .ys-embed{
+  border-radius:16px;background:var(--glass);animation:none;
+  box-shadow:0 0 0 3px var(--glass),0 0 0 4px var(--steel),0 0 0 5px rgba(255,255,255,.8),0 0 22px var(--neon-soft);
+}
+
+.skin-chrome .ys-controls{padding:14px 2px 0;gap:10px}
+.skin-chrome .ys-controls-gap{ /* ribbed vent between the buttons */
+  height:16px;border-radius:8px;
+  background:repeating-linear-gradient(90deg,#1a222c 0 2px,#aab2bd 2px 3px,#e9edf2 3px 5px);
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.6),0 1px 0 rgba(255,255,255,.8);
+}
+.skin-chrome .ys-btn{
+  color:var(--neon);border:1px solid #1c2836;
+  background:radial-gradient(circle at 35% 28%,#2b3847 0%,var(--glass) 70%);
+  box-shadow:0 0 0 2px #e3e7ec,0 0 0 3px var(--steel),0 3px 6px rgba(0,0,0,.55),inset 0 0 10px rgba(40,160,255,.45);
+}
+.skin-chrome .ys-btn:hover{border-color:var(--neon);color:#d6f1ff}
+.skin-chrome .ys-btn:active{box-shadow:0 0 0 2px #e3e7ec,0 0 0 3px var(--steel),inset 0 0 14px rgba(40,160,255,.8)}
+.skin-chrome .ys-btn.is-primary{color:#eaf7ff;background:radial-gradient(circle at 35% 28%,#5cc4ff 0%,#0d6fb8 70%)}
+.skin-chrome .ys-repeat.is-off{color:#35536b}
+.skin-chrome .ys-repeat.is-all,.skin-chrome .ys-repeat.is-one{
+  color:#eaf7ff;border-color:var(--neon);background:radial-gradient(circle at 35% 28%,#2f6f9f 0%,#06243a 70%);
+  box-shadow:0 0 0 2px #e3e7ec,0 0 0 3px var(--steel),0 0 14px var(--neon),inset 0 0 10px rgba(120,210,255,.7);
+}
+.skin-chrome .ys-repeat-one{background:var(--neon);color:var(--glass);box-shadow:0 0 0 2px var(--glass)}
+
+.skin-chrome .ys-mini{
+  color:#e2f4ff;
+  background:linear-gradient(104deg,#f5f7fa 0%,#c5cbd4 22%,#f1f3f7 40%,#a4acb8 62%,#e3e7ec 80%,#8a93a0 100%);
+  box-shadow:0 16px 36px -8px rgba(0,0,0,.9),0 0 0 1px #4d5662,0 0 26px rgba(40,160,255,.4),inset 0 1px 0 #fff;
+}
+.skin-chrome .ys-mini-title{
+  align-self:stretch;justify-content:center;padding:2px 14px;border-radius:999px;background:var(--glass);
+  box-shadow:inset 0 0 14px rgba(40,160,255,.35),0 0 0 1px var(--steel);
+}
+.skin-chrome .ys-mini-title span{
+  font-family:"Eurostile","Bank Gothic","Segoe UI",Roboto,system-ui,sans-serif;font-variation-settings:normal;
+  font-size:13px;letter-spacing:.06em;text-transform:uppercase;text-shadow:0 0 8px var(--neon-soft);
+}
+.skin-chrome .ys-mini-title small{color:var(--neon)}
+
 /* /yoasobi?debug: what the Spotify player reports */
 .ys-debug{
   position:fixed;z-index:29;left:8px;bottom:78px;max-width:calc(100% - 16px);max-height:46vh;overflow:auto;padding:8px 10px;border-radius:8px;
@@ -262,6 +380,7 @@
   .ys-main{grid-template-columns:minmax(0,1fr);gap:40px}
   .ys-shelves,.ys-side{grid-column:1;grid-row:auto}
   .ys-side{position:static;width:100%;max-width:520px;margin:0 auto}
+  .skin-chrome .ys-side{margin-top:34px}
 }
 @media (max-width:699px){
   .ys{padding:28px 16px 110px}
@@ -273,5 +392,5 @@
 }
 @media (prefers-reduced-motion:reduce){
   .mb-cell,.mb-disc,.ys-mini,.ys-embed,.ys-eq.is-on i,.mb.is-playing .mb-crank,.mb.is-playing .mb-notes i{animation:none}
-  .mb::before,.mb-lid,.mb-body,.mb-key,.ys-btn{transition:none}
+  .mb::before,.mb-lid,.mb-body,.mb-key,.ys-btn,.ys-skin{transition:none}
 }
