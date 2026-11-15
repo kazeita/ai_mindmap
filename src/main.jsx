@@ -7,6 +7,7 @@ import SiteTabs, { TABS, tabForPath } from './SiteTabs.jsx'
 const DraftBoard = lazy(() => import('./draft-board/DraftBoard.jsx'))
 const EndlessWay = lazy(() => import('./stories/EndlessWay.jsx'))
 const YoasobiSpace = lazy(() => import('./yoasobi/YoasobiSpace.jsx'))
+const FibLab = lazy(() => import('./fib-lab/FibLab.jsx'))
 
 const path = window.location.pathname
 const isV1 = path === '/v1' || path.startsWith('/v1/')
@@ -73,6 +74,13 @@ function Site() {
         {visited.has('yoasobi') && (
           <Suspense fallback={<p className="site-loading">Loading…</p>}>
             <YoasobiSpace />
+          </Suspense>
+        )}
+      </div>
+      <div className="site-view" hidden={active !== 'fib'}>
+        {visited.has('fib') && (
+          <Suspense fallback={<p className="site-loading">Loading Fib Lab…</p>}>
+            <FibLab />
           </Suspense>
         )}
       </div>

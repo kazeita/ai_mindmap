@@ -7,6 +7,7 @@ export const TABS = [
   { id: "endless", path: "/endless-way", label: "Endless Way", title: "Endless Way" },
   { id: "amber", path: "/amber-heart", label: "Amber Heart", title: "The Amber Heart" },
   { id: "yoasobi", path: "/yoasobi", label: "YOASOBI", title: "YOASOBI in orbit · latest releases" },
+  { id: "fib", path: "/fib-lab", label: "Fib Lab", title: "Fib Lab · two truths and a lie, science edition", badge: "New" },
 ];
 
 export const tabForPath = (path) =>
