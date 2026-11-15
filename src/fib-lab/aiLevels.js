@@ -9,18 +9,19 @@ export const TOTAL = LEVELS.length + AI_LEVEL_COUNT;
 
 const BATCH = 5;
 const ORDER = ["life", "chem", "phys", "space", "body", "earth"];
-const CACHE_KEY = "fiblab.ai.v1";
+const CACHE_KEY = "fiblab.ai.v2"; // v1 levels read like exam questions, so they are dropped
 const CACHE_CAP = 1500; // about 600 KB; past this the oldest levels are dropped and rewritten if replayed
-const MAX_LEN = 320;
+const MAX_STATEMENT = 180; // the prompt asks for 90; anything far longer reads like a textbook
+const MAX_WHY = 320;
 
 // A random focus per level keeps 10,000 levels from circling the same few facts.
 const FOCUS = {
-  life: ["insects", "birds", "ocean animals", "reptiles and amphibians", "mammals", "plants", "trees", "fungi", "microbes", "cells", "genetics and DNA", "evolution", "ecosystems and food chains", "animal senses", "animal behavior", "dinosaurs and fossils", "deep-sea life", "rainforest life", "polar animals", "pollination and seeds"],
-  chem: ["elements of the periodic table", "metals", "gases", "acids and bases", "chemical reactions", "chemistry in the kitchen", "salts and crystals", "water chemistry", "carbon and organic molecules", "atoms and their structure", "states of matter", "polymers and plastics", "household chemicals", "fire and combustion", "chemistry of color", "batteries and electrochemistry", "noble gases", "radioactivity", "the air we breathe", "minerals and gemstones"],
-  phys: ["light and optics", "sound", "electricity", "magnetism", "forces and motion", "gravity", "heat and temperature", "energy", "waves", "pressure and fluids", "simple machines", "relativity", "quantum physics", "nuclear physics", "the electromagnetic spectrum", "friction", "everyday physics", "measurement and units", "lasers", "flight and aerodynamics"],
-  space: ["the Sun", "the Moon", "Mercury and Venus", "Mars", "Jupiter and Saturn", "Uranus and Neptune", "dwarf planets", "comets and asteroids", "meteors and meteorites", "stars and how they live", "black holes", "galaxies", "the Big Bang and the universe", "exoplanets", "eclipses", "space exploration", "astronauts and living in space", "telescopes", "constellations and the night sky", "orbits and gravity in space"],
-  body: ["the heart and blood", "the brain and nerves", "bones and joints", "muscles", "skin, hair and nails", "the eyes and vision", "ears and hearing", "taste and smell", "digestion", "the lungs and breathing", "the immune system", "sleep", "teeth", "hormones", "genetics in people", "the kidneys and liver", "nutrition and vitamins", "growth and aging", "common health myths", "the senses and reflexes"],
-  earth: ["volcanoes", "earthquakes", "plate tectonics", "rocks and minerals", "weather", "clouds and rain", "climate", "oceans and tides", "rivers and lakes", "glaciers and ice", "deserts", "the atmosphere", "caves", "soil", "storms and hurricanes", "Earth's layers", "fossils and Earth's history", "mountains", "the water cycle", "natural resources and energy"],
+  life: ["insects", "birds", "sea creatures", "snakes, lizards and frogs", "pets and farm animals", "wild mammals", "plants and flowers", "trees", "mushrooms and mold", "germs and bacteria", "animal superpowers", "how animals sleep, eat and move", "dinosaurs and fossils", "deep-sea creatures", "jungle animals", "polar animals", "bees and pollination", "animal myths people believe", "baby animals", "animal senses"],
+  chem: ["metals", "gases around us", "chemistry in the kitchen", "salt and sugar", "water", "ice and steam", "rust and things that corrode", "fire", "household cleaners", "plastics", "colors and dyes", "fizzy drinks and bubbles", "batteries", "diamonds and gemstones", "gold and silver", "the air we breathe", "what everyday things are made of", "smells", "baking and cooking reactions", "chemistry myths people believe"],
+  phys: ["light and color", "rainbows and mirrors", "sound and music", "electricity at home", "magnets", "how things fall", "heat and cold", "floating and sinking", "speed and motion", "physics in sports", "physics in the kitchen", "weight and gravity", "rubber bands and springs", "lightning and static", "airplanes and flight", "cars and bikes", "everyday machines", "lasers and screens", "temperature", "physics myths people believe"],
+  space: ["the Sun", "the Moon", "Mars", "Venus and Mercury", "Jupiter and Saturn", "the far planets", "Pluto and dwarf planets", "comets and asteroids", "shooting stars", "stars", "black holes", "galaxies", "eclipses", "astronauts' daily life", "rockets and space travel", "telescopes", "the night sky", "day, night and seasons", "Earth seen from space", "space myths people believe"],
+  body: ["the heart and blood", "the brain", "bones", "muscles", "skin, hair and nails", "eyes", "ears and hearing", "taste and smell", "the stomach and digestion", "lungs and breathing", "getting sick and germs", "sleep and dreams", "teeth", "sneezing, yawning and hiccups", "babies and growing up", "food and vitamins", "exercise", "the senses", "body facts that sound fake", "health myths people believe"],
+  earth: ["volcanoes", "earthquakes", "rocks and crystals", "weather", "clouds and rain", "snow and ice", "oceans and waves", "rivers and lakes", "deserts", "mountains", "caves", "storms", "the seasons", "Earth's insides", "beaches and sand", "lightning and thunder", "fossils", "the air and sky", "maps and the shape of Earth", "weather myths people believe"],
 };
 
 export const subjectFor = (n) => (n <= LEVELS.length ? LEVELS[n - 1].cat : ORDER[(n - 1) % ORDER.length]);
@@ -47,10 +48,10 @@ function writeCache() {
   }
 }
 
-const str = (s) => typeof s === "string" && s.trim().length > 0 && s.length <= MAX_LEN;
+const str = (s, max) => typeof s === "string" && s.trim().length > 0 && s.length <= max;
 function valid(lv) {
   if (!lv || !Array.isArray(lv.truths) || lv.truths.length !== 2) return false;
-  if (![...lv.truths, lv.lie, lv.why].every(str)) return false;
+  if (![...lv.truths, lv.lie].every((s) => str(s, MAX_STATEMENT)) || !str(lv.why, MAX_WHY)) return false;
   const all = [...lv.truths, lv.lie].map((s) => s.trim().toLowerCase());
   return new Set(all).size === 3;
 }
@@ -88,8 +89,8 @@ function buildMessage(ns) {
     return `- n=${n}, subject: ${SUBJECTS[cat].name}, focus: ${focus}`;
   });
   // Recent AI lies plus a sample of the hand-written ones, so new levels don't repeat them.
-  const recent = [...readCache().values()].slice(-60).map((lv) => lv.lie);
-  const classics = LEVELS.filter((_, i) => i % 3 === 0).map((L) => L.lie);
+  const recent = [...readCache().values()].slice(-30).map((lv) => lv.lie);
+  const classics = LEVELS.map((L) => L.lie);
   const avoid = [...recent, ...classics].map((s) => `- ${s}`).join("\n");
   return `Write these ${ns.length} levels:\n${lines.join("\n")}\n\nAvoid (already used as lies):\n${avoid}`;
 }
