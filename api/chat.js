@@ -12,6 +12,7 @@ const PROMPTS = {
  details: TONE + "\n\nExplain a single diagnostic question in the context of a user's problem. Write a warm, plain-language explanation of roughly 200 words (180 to 220). Cover: what this typically looks like in everyday life, why it matters for their situation, and a concrete way to notice if it's happening to them.",
 
  insight: TONE + "\n\nThe user is exploring their problem. Given their path so far, the question they are investigating, and their free-text answer, reply in 3 to 5 sentences:\n1. Acknowledge what is narrowed down.\n2. Interpret their answer in context, like a sharp friend would.\n3. Suggest a likely root cause or a concrete next step.\nSpeak directly to the user. Keep it user-centric.",
+ fiblab: "You write levels for Fib Lab, a science trivia game. In every level, two statements are TRUE and one is a LIE, and the player has to find the lie.\n\nRules for every level:\n- Science only, on the subject and focus given for that level.\n- TRUE statements must be well-established textbook science that no expert would dispute. Avoid record-holders and counts that change over time (number of known moons, newest discoveries), and avoid 'a recent study found' claims.\n- The LIE must be clearly false by mainstream science, never partly true and never a wording trick. Make it plausible: a common misconception is ideal.\n- All three statements share the level's focus and have a similar length and style, so length or tone doesn't give the lie away. Each is one sentence of at most 140 characters.\n- \"why\" says what is actually true, correcting the lie, in 1 or 2 sentences and at most 220 characters.\n- Plain, friendly English for curious teenagers and adults. No jokes inside the statements.\n- Never reuse or paraphrase anything listed under Avoid, and make each level in the batch about something different.\n\nReturn ONLY a JSON array, one object per requested level, no markdown fences:\n[{\"n\": 121, \"truths\": [\"...\", \"...\"], \"lie\": \"...\", \"why\": \"...\"}]",
 };
 
 const MAX_TOKENS_BY_KIND = {
@@ -21,9 +22,13 @@ const MAX_TOKENS_BY_KIND = {
  followup: 512,
  details: 1024,
  insight: 512,
+ fiblab: 3072,
 };
 
 const TEMPERATURE = 0.8;
+// Fib Lab needs facts more than flair, and its reply must be bare JSON.
+const TEMPERATURE_BY_KIND = { fiblab: 0.6 };
+const JSON_KINDS = new Set(["fiblab"]);
 const MAX_USER_MESSAGE_CHARS = 16000;
 
 // Abuse guard. Browsers always send Origin on a JSON POST; scripts usually don't.
@@ -101,7 +106,11 @@ export default async function handler(req, res) {
  body: JSON.stringify({
  systemInstruction: { parts: [{ text: systemPrompt }] },
  contents: [{ role: "user", parts: [{ text: userMessage }] }],
- generationConfig: { maxOutputTokens: maxOutputTokens, temperature: TEMPERATURE },
+ generationConfig: {
+ maxOutputTokens: maxOutputTokens,
+ temperature: TEMPERATURE_BY_KIND[kind] ?? TEMPERATURE,
+ ...(JSON_KINDS.has(kind) && { responseMimeType: "application/json" }),
+ },
  }),
  }
  );

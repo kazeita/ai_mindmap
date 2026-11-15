@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LEVELS, SUBJECTS } from "./levels.js";
+import { AI_START, TOTAL, discardLevel, ensureLevel, getLevel, isAiLevel, prefetch, subjectFor } from "./aiLevels.js";
 import "./fib-lab.css";
 
 // Fonts load on their own, so a blocked font request never blocks the game.
@@ -12,9 +13,12 @@ if (!document.querySelector(`link[href="${FONTS}"]`)) {
   document.head.appendChild(link);
 }
 
-const TOTAL = LEVELS.length;
 const LETTERS = ["A", "B", "C"];
 const FILTERS = [["all", "All"], ...Object.entries(SUBJECTS).map(([k, s]) => [k, s.name])];
+const PAGE = 100;
+const PAGES = Math.ceil(TOTAL / PAGE);
+const fmt = (n) => n.toLocaleString("en-US");
+const pageOf = (n) => Math.floor((n - 1) / PAGE);
 
 // Progress lives in this browser only: { res: { [level]: 1 right | 0 missed }, streak, best }
 const KEY = "fiblab.v1";
@@ -40,27 +44,67 @@ function shuffle(a) {
   return a;
 }
 
-function startLevel(n) {
-  const L = LEVELS[n - 1];
-  return { n, picked: null, opts: shuffle([{ text: L.truths[0] }, { text: L.truths[1] }, { text: L.lie, lie: true }]) };
+const readyState = (L) => ({
+  n: L.n,
+  status: "ready",
+  level: L,
+  picked: null,
+  opts: shuffle([{ text: L.truths[0] }, { text: L.truths[1] }, { text: L.lie, lie: true }]),
+});
+
+function firstUnplayed(res) {
+  for (let n = 1; n <= TOTAL; n++) if (!(n in res)) return n;
+  return null;
 }
 
 export default function FibLab() {
   const [prog, setProg] = useState(loadProgress);
   const [filter, setFilter] = useState("all");
+  const [page, setPage] = useState(() => pageOf(firstUnplayed(loadProgress().res) ?? 1));
   const [game, setGame] = useState(null); // null = level board
   const [confirmReset, setConfirmReset] = useState(false);
   const root = useRef(null);
   const titleRef = useRef(null);
   const nextRef = useRef(null);
 
-  const play = useCallback((n) => setGame(startLevel(n)), []);
-  const showBoard = useCallback(() => setGame(null), []);
-  const next = useCallback(() => setGame((g) => (g && g.n < TOTAL ? startLevel(g.n + 1) : null)), []);
+  const play = useCallback((n) => {
+    const ready = getLevel(n);
+    if (ready) {
+      setGame(readyState(ready));
+      prefetch(n + 1);
+      return;
+    }
+    setGame({ n, status: "loading", picked: null });
+    ensureLevel(n)
+      .then((L) => {
+        setGame((g) => (g && g.n === n && g.status === "loading" ? readyState(L) : g));
+        prefetch(n + 1);
+      })
+      .catch((err) => {
+        setGame((g) => (g && g.n === n && g.status === "loading" ? { ...g, status: "error", error: err.message } : g));
+      });
+  }, []);
+
+  const showBoard = useCallback(() => {
+    if (game) setPage(pageOf(game.n));
+    setGame(null);
+  }, [game]);
+
+  const next = useCallback(() => {
+    if (!game) return;
+    if (game.n < TOTAL) play(game.n + 1);
+    else showBoard();
+  }, [game, play, showBoard]);
+
+  const swap = useCallback(() => {
+    if (!game || !isAiLevel(game.n)) return;
+    discardLevel(game.n);
+    play(game.n);
+  }, [game, play]);
 
   const pick = useCallback(
     (i) => {
-      if (!game || game.picked !== null) return;
+      if (!game || game.status !== "ready" || game.picked !== null) return;
       const right = !!game.opts[i].lie;
       const streak = right ? prog.streak + 1 : 0;
       const np = { res: { ...prog.res, [game.n]: right ? 1 : 0 }, streak, best: Math.max(prog.best, streak) };
@@ -88,14 +132,15 @@ export default function FibLab() {
     const onKey = (e) => {
       if (!game || e.metaKey || e.ctrlKey || e.altKey) return;
       if (!root.current || root.current.closest("[hidden]")) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
       const k = e.key.toLowerCase();
-      if (game.picked === null) {
+      if (game.status === "ready" && game.picked === null) {
         const idx = { 1: 0, 2: 1, 3: 2, a: 0, b: 1, c: 2 }[k];
         if (idx !== undefined) {
           e.preventDefault();
           pick(idx);
         }
-      } else if (k === "arrowright" || (k === "enter" && document.activeElement !== nextRef.current)) {
+      } else if (game.picked !== null && (k === "arrowright" || (k === "enter" && document.activeElement !== nextRef.current))) {
         e.preventDefault();
         next();
       }
@@ -115,6 +160,8 @@ export default function FibLab() {
             onPick={pick}
             onNext={next}
             onBack={showBoard}
+            onRetry={() => play(game.n)}
+            onSwap={swap}
             titleRef={titleRef}
             nextRef={nextRef}
           />
@@ -123,6 +170,8 @@ export default function FibLab() {
             prog={prog}
             filter={filter}
             setFilter={setFilter}
+            page={page}
+            setPage={setPage}
             onPlay={play}
             confirmReset={confirmReset}
             setConfirmReset={setConfirmReset}
@@ -130,6 +179,7 @@ export default function FibLab() {
               setProg(EMPTY);
               saveProgress(EMPTY);
               setConfirmReset(false);
+              setPage(0);
             }}
           />
         )}
@@ -138,13 +188,26 @@ export default function FibLab() {
   );
 }
 
-function Board({ prog, filter, setFilter, onPlay, confirmReset, setConfirmReset, onReset }) {
-  const played = LEVELS.filter((L) => L.n in prog.res);
-  const right = played.filter((L) => prog.res[L.n] === 1).length;
-  const allRight = LEVELS.every((L) => prog.res[L.n] === 1);
-  const resume =
-    LEVELS.find((L) => !(L.n in prog.res))?.n ?? LEVELS.find((L) => prog.res[L.n] === 0)?.n ?? 1;
-  const list = LEVELS.filter((L) => filter === "all" || L.cat === filter);
+function Board({ prog, filter, setFilter, page, setPage, onPlay, confirmReset, setConfirmReset, onReset }) {
+  const [jump, setJump] = useState("");
+  const playedKeys = Object.keys(prog.res).filter((k) => +k >= 1 && +k <= TOTAL);
+  const right = playedKeys.filter((k) => prog.res[k] === 1).length;
+  const unplayed = firstUnplayed(prog.res);
+  const resume = unplayed ?? Number(playedKeys.find((k) => prog.res[k] === 0) ?? 1);
+
+  const first = page * PAGE + 1;
+  const last = Math.min(TOTAL, first + PAGE - 1);
+  const ns = [];
+  for (let n = first; n <= last; n++) if (filter === "all" || subjectFor(n) === filter) ns.push(n);
+
+  const jumpTo = (e) => {
+    e.preventDefault();
+    const n = Math.round(Number(jump));
+    if (n >= 1 && n <= TOTAL) {
+      setJump("");
+      onPlay(n);
+    }
+  };
 
   return (
     <>
@@ -157,13 +220,11 @@ function Board({ prog, filter, setFilter, onPlay, confirmReset, setConfirmReset,
         </div>
         <div className="fib-stats" aria-label="Your progress">
           <div className="fib-stat">
-            <b>
-              {played.length}/{TOTAL}
-            </b>
-            <span>Played</span>
+            <b>{fmt(playedKeys.length)}</b>
+            <span>Played of {fmt(TOTAL)}</span>
           </div>
           <div className="fib-stat">
-            <b>{played.length ? `${Math.round((right / played.length) * 100)}%` : "–"}</b>
+            <b>{playedKeys.length ? `${Math.round((right / playedKeys.length) * 100)}%` : "–"}</b>
             <span>Correct</span>
           </div>
           <div className="fib-stat">
@@ -188,37 +249,78 @@ function Board({ prog, filter, setFilter, onPlay, confirmReset, setConfirmReset,
             </button>
           ))}
         </div>
-        <button type="button" className="fib-primary" onClick={() => onPlay(allRight ? 1 : resume)}>
-          {allRight ? "Replay from level 1" : played.length ? `Continue: level ${resume}` : "Play level 1"}
+        <button type="button" className="fib-primary" onClick={() => onPlay(resume)}>
+          {playedKeys.length ? `Continue: level ${fmt(resume)}` : "Play level 1"}
         </button>
       </div>
 
+      <div className="fib-pager">
+        <div className="fib-pager-nav">
+          <button type="button" className="fib-step" onClick={() => setPage(page - 1)} disabled={page === 0} aria-label="Previous 100 levels">
+            ‹
+          </button>
+          <label className="fib-visually-hidden" htmlFor="fib-page">
+            Level range
+          </label>
+          <select id="fib-page" className="fib-select" value={page} onChange={(e) => setPage(Number(e.target.value))}>
+            {Array.from({ length: PAGES }, (_, p) => (
+              <option key={p} value={p}>
+                Levels {fmt(p * PAGE + 1)}–{fmt(Math.min(TOTAL, (p + 1) * PAGE))}
+                {p * PAGE + 1 >= AI_START ? " · AI" : (p + 1) * PAGE >= AI_START ? " · some AI" : ""}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="fib-step" onClick={() => setPage(page + 1)} disabled={page === PAGES - 1} aria-label="Next 100 levels">
+            ›
+          </button>
+        </div>
+        <form className="fib-jump" onSubmit={jumpTo}>
+          <label htmlFor="fib-jump">Go to level</label>
+          <input
+            id="fib-jump"
+            type="number"
+            inputMode="numeric"
+            min="1"
+            max={TOTAL}
+            placeholder={`1–${fmt(TOTAL)}`}
+            value={jump}
+            onChange={(e) => setJump(e.target.value)}
+          />
+          <button type="submit" className="fib-step wide">
+            Go
+          </button>
+        </form>
+      </div>
+
       <div className="fib-board">
-        {list.map((L) => {
-          const r = prog.res[L.n];
+        {ns.map((n) => {
+          const cat = subjectFor(n);
+          const r = prog.res[n];
+          const ai = isAiLevel(n);
           const state = r === 1 ? " right" : r === 0 ? " wrong" : "";
           const status = r === 1 ? "found the lie" : r === 0 ? "missed" : "not played";
           return (
             <button
-              key={L.n}
+              key={n}
               type="button"
-              className={`fib-tile cat-${L.cat}${state}`}
-              aria-label={`Level ${L.n}, ${SUBJECTS[L.cat].name}, ${status}`}
-              onClick={() => onPlay(L.n)}
+              className={`fib-tile cat-${cat}${state}`}
+              aria-label={`Level ${n}, ${SUBJECTS[cat].name}${ai ? ", written by AI" : ""}, ${status}`}
+              onClick={() => onPlay(n)}
             >
-              <span className="num">{L.n}</span>
+              <span className="num">{fmt(n)}</span>
               <span className="mark" aria-hidden="true">
-                {r === 1 ? "✓" : r === 0 ? "✗" : ""}
+                {r === 1 ? "✓" : r === 0 ? "✗" : ai ? <span className="ai">AI</span> : ""}
               </span>
               <span className="sym" aria-hidden="true">
-                {SUBJECTS[L.cat].sym}
+                {SUBJECTS[cat].sym}
               </span>
               <span className="nm" aria-hidden="true">
-                {SUBJECTS[L.cat].name}
+                {SUBJECTS[cat].name}
               </span>
             </button>
           );
         })}
+        {ns.length === 0 && <p className="fib-empty">No {SUBJECTS[filter]?.name} levels in this range.</p>}
       </div>
 
       <div className="fib-legend">
@@ -234,11 +336,14 @@ function Board({ prog, filter, setFilter, onPlay, confirmReset, setConfirmReset,
           <i className="l-wrong" />
           Missed, replay anytime
         </span>
+        <span>
+          <b className="ai">AI</b> Written live by AI, not fact-checked
+        </span>
       </div>
 
       <div className="fib-foot">
         <span>
-          {TOTAL} levels across {Object.keys(SUBJECTS).length} subjects
+          Levels 1–{LEVELS.length} are hand-written. Levels {fmt(AI_START)}–{fmt(TOTAL)} are written by AI when you reach them.
         </span>
         <span aria-hidden="true">·</span>
         {confirmReset ? (
@@ -261,12 +366,14 @@ function Board({ prog, filter, setFilter, onPlay, confirmReset, setConfirmReset,
   );
 }
 
-function Level({ game, prog, onPick, onNext, onBack, titleRef, nextRef }) {
-  const L = LEVELS[game.n - 1];
-  const S = SUBJECTS[L.cat];
+function Level({ game, prog, onPick, onNext, onBack, onRetry, onSwap, titleRef, nextRef }) {
+  const { n } = game;
+  const cat = subjectFor(n);
+  const S = SUBJECTS[cat];
+  const ai = isAiLevel(n);
   const answered = game.picked !== null;
   const right = answered && !!game.opts[game.picked].lie;
-  const lieIdx = game.opts.findIndex((o) => o.lie);
+  const lieIdx = game.status === "ready" ? game.opts.findIndex((o) => o.lie) : -1;
 
   return (
     <>
@@ -276,67 +383,111 @@ function Level({ game, prog, onPick, onNext, onBack, titleRef, nextRef }) {
         </button>
         <div className="fib-meta">
           <span>
-            {L.n} / {TOTAL}
+            {fmt(n)} / {fmt(TOTAL)}
           </span>
           <span>Streak {prog.streak}</span>
         </div>
       </div>
 
       <div className="fib-level-head">
-        <div className={`fib-level-tag cat-${L.cat}`}>
+        <div className={`fib-level-tag cat-${cat}`}>
           <div className="badge">
             <span>{S.sym}</span>
-            <small>{L.n}</small>
+            <small>{fmt(n)}</small>
           </div>
           <div className="cname">{S.name}</div>
         </div>
         <h2 ref={titleRef} tabIndex={-1}>
-          Level {L.n}: which one is the lie?
+          Level {fmt(n)}: which one is the lie?
         </h2>
+        {ai && game.status === "ready" && (
+          <p className="fib-ai-note">
+            <b className="ai">AI</b>
+            <span>Written by AI just now. It hasn't been fact-checked, so it can be wrong.</span>
+            {!answered && (
+              <button type="button" className="fib-link" onClick={onSwap}>
+                Get a different question
+              </button>
+            )}
+          </p>
+        )}
       </div>
 
-      <div className="fib-opts">
-        {game.opts.map((o, i) => (
-          <button
-            key={`${game.n}-${i}`}
-            type="button"
-            disabled={answered}
-            className={`fib-opt${answered ? ` revealed ${o.lie ? "is-lie" : "is-true"}` : ""}${game.picked === i ? " picked" : ""}`}
-            onClick={() => onPick(i)}
-          >
-            <span className="key">{LETTERS[i]}</span>
-            <span className="txt">{o.text}</span>
-            {answered && <span className="stamp">{o.lie ? "Lie" : "True"}</span>}
-          </button>
-        ))}
-      </div>
+      {game.status === "loading" && (
+        <div className="fib-opts" aria-busy="true">
+          <p className="fib-status" role="status">
+            Writing level {fmt(n)}…
+          </p>
+          {LETTERS.map((l) => (
+            <div key={l} className="fib-opt skeleton" aria-hidden="true">
+              <span className="key">{l}</span>
+              <span className="txt">
+                <span className="bar" />
+                <span className="bar short" />
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {game.status === "error" && (
+        <div className="fib-verdict bad" role="alert">
+          <h3>Level {fmt(n)} couldn't be written</h3>
+          <p>{game.error}</p>
+          <div className="fib-actions">
+            <button type="button" className="fib-primary" onClick={onRetry}>
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {game.status === "ready" && (
+        <div className="fib-opts">
+          {game.opts.map((o, i) => (
+            <button
+              key={`${n}-${i}`}
+              type="button"
+              disabled={answered}
+              className={`fib-opt${answered ? ` revealed ${o.lie ? "is-lie" : "is-true"}` : ""}${game.picked === i ? " picked" : ""}`}
+              onClick={() => onPick(i)}
+            >
+              <span className="key">{LETTERS[i]}</span>
+              <span className="txt">{o.text}</span>
+              {answered && <span className="stamp">{o.lie ? "Lie" : "True"}</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {answered && (
         <div className={`fib-verdict ${right ? "good" : "bad"}`} aria-live="polite">
           <h3>{right ? "Correct. You caught the lie." : `Not quite. ${LETTERS[lieIdx]} was the lie.`}</h3>
           <span className="label">The real science</span>
-          <p>{L.why}</p>
+          <p>{game.level.why}</p>
         </div>
       )}
 
-      <div className="fib-actions">
-        {answered && (
-          <button type="button" className="fib-primary" ref={nextRef} onClick={onNext}>
-            {L.n < TOTAL ? `Next: level ${L.n + 1} →` : "Back to all levels"}
-          </button>
-        )}
-        <span className="fib-hint">
-          {answered ? (
-            <>
-              Press <kbd>Enter</kbd> for the next level
-            </>
-          ) : (
-            <>
-              Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> to choose
-            </>
+      {game.status === "ready" && (
+        <div className="fib-actions">
+          {answered && (
+            <button type="button" className="fib-primary" ref={nextRef} onClick={onNext}>
+              {n < TOTAL ? `Next: level ${fmt(n + 1)} →` : "Back to all levels"}
+            </button>
           )}
-        </span>
-      </div>
+          <span className="fib-hint">
+            {answered ? (
+              <>
+                Press <kbd>Enter</kbd> for the next level
+              </>
+            ) : (
+              <>
+                Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> to choose
+              </>
+            )}
+          </span>
+        </div>
+      )}
     </>
   );
 }
